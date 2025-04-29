@@ -42,7 +42,7 @@ to our needs:
   out of the N jobs in the batch, and sequentially runs those large jobs for each batch.
   Given the nature of bioinformatics processing, job output processing times are expected to be
   highly variable, with times ranging from seconds to hours or even days.
-r * Parallelizing `forEachBatch` independently would cause massive message duplication as each
+* Parallelizing `forEachBatch` independently would cause massive message duplication as each
   SSS instance manages its own Kafka offsets.
   
 As such, we will implement with a standard Kafka client like `python-kafka`.
