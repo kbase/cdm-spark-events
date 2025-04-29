@@ -14,6 +14,10 @@ The action taken depends on the nature of the event. For instance, if a CTS job 
 places job output in the data plane, the event system may run code to import data into CDM
 Deltalake tables.
 
+For example, the CTS could run checkm2 on a set of input files, and when the job is complete,
+the event processor parses the checkm2 output in the data plane and inserts the results into
+the deltalake tables.
+
 ## Notes on Spark Structured Streaming
 
 Since the initial target of the event processor is importing CTS job data into the Spark
@@ -35,10 +39,10 @@ to our needs:
   which means the processing time for the batch is equal to the processing time of largest
   job output in the batch if the batch is parallelized. `forEachBatch` doesn't allow for
   true parallelism - instead, from a performance perspective, it effectively picks the largest job
-  out of the N jobs in the batch, and sequentially runs those large jobs. Given the nature of
-  bioinformatics processing, job output processing times are expected to be highly variable,
-  with times ranging from seconds to hours or even days.
-* Parallelizing `forEachBatch` independently would case massive message duplication as each
+  out of the N jobs in the batch, and sequentially runs those large jobs for each batch.
+  Given the nature of bioinformatics processing, job output processing times are expected to be
+  highly variable, with times ranging from seconds to hours or even days.
+r * Parallelizing `forEachBatch` independently would cause massive message duplication as each
   SSS instance manages its own Kafka offsets.
   
 As such, we will implement with a standard Kafka client like `python-kafka`.
@@ -80,7 +84,7 @@ For now the design will be focused solely on responding to CTS completed job eve
 ### Error handling
 
 * After a specified number of failures for processing a job's output, the Kafka message, with
-  new fields including the error message and stacktrace, will be sent to a Kafka deal letter
+  new fields including the error message and stacktrace, will be sent to a Kafka dead letter
   queue (DLQ).
 * For now manual processing will be required to examine the messages and start an event processor
   pointed at the DLQ.
