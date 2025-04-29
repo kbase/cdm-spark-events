@@ -1,19 +1,10 @@
 # CDM Spark Events Design
 
-
-TODO
-* open ai discussions
-* spark streaming docs
-   * checkpointing
-   * confirm scaling
-* error handling, dead letter queue
-* Clean up, make coherent
-
 ## Nomenclature
 
 * CTS - the [CDM Task Service](https://github.com/kbase/cdm-task-service)
 
-## Document purpose
+## Purpose
 
 The CDM Spark events repo is responsible for automatically taking action based on upstream events.
 The initial target is processing output from the CTS, but additional event sources
@@ -42,11 +33,12 @@ to our needs:
   jobs for the CTS jobs in the batch. However,
   [only one batch runs at a time](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#triggers)
   which means the processing time for the batch is equal to the processing time of largest
-  job output in the batch. `forEachBatch` doesn't allow for true parallelism -
-  instead it effectively picks the largest job out of the N batch jobs, and sequentially
-  runs those large jobs. Given the nature of bioinformatics processing, job output processing
-  times are expected to be highly variable, with times ranging from seconds to hours or even days.
-* Parallelizing `foreEachBatch` independently would case massive message duplication as each
+  job output in the batch if the batch is parallelized. `forEachBatch` doesn't allow for
+  true parallelism - instead, from a performance perspective, it effectively picks the largest job
+  out of the N jobs in the batch, and sequentially runs those large jobs. Given the nature of
+  bioinformatics processing, job output processing times are expected to be highly variable,
+  with times ranging from seconds to hours or even days.
+* Parallelizing `forEachBatch` independently would case massive message duplication as each
   SSS instance manages its own Kafka offsets.
   
 As such, we will implement with a standard Kafka client like `python-kafka`.
@@ -55,31 +47,47 @@ As such, we will implement with a standard Kafka client like `python-kafka`.
 
 For now the design will be focused solely on responding to CTS completed job events.
 
-* Spark streaming from Kafka
-    * Automatically parallelizes based on `max(kafka_partitions, cluster_cores)`
-* `forEach` sink
-* Will not support state management (e.g. deduplication, aggregations)
-    * Since `forEach` sinks don't guarantee exactly-once operation, deduplication
-      isn't particularly useful
-* Starts a streaming spark session
-    * Adds zip or zips (see Adding importer code below) for importers and dependencies
-    * For each Kafka message
-    * pulls the CTS job based on the ID
-        * Maps the job image name to the python code to run
-                * Only python supported
-            * Image name -> code only, no tag / digest
-            * Code is responsible for dealing with potential processing changes per
-              image digest
-                * Tag is not supplied as it is mutable, code should key off the digest
-        * Create a YAML file with
-            * The image name and digest
-            * Input file locations in S3
-            * Program arguments
-                * Not strictly necessary, but some importers may need to key off
-                  arguments
-        * Run the python code with the YAML file as input
+* Parallelism is based on scaling multiple Docker containers, each running a sequential,
+  single threaded event loop with access to a Spark session.
+    * The parallelism is limited by the number of partitions in the Kafka topic.
+* Interaction with Kafka will be via the `python-kafka` client.
+* For the first iteration, the spark session will be recreated for each job.
+    * Future work could investigate whether there are performance improvements from
+      sharing the session and whether sharing may cause conflicts between importers.
+* For each Kafka message
+    * pull the CTS job based on the ID
+    * Map the job image name to the python importer code to run
+        * Mappings must be made available to the processor (see below)
+        * Image name -> code only, no tag or digest
+        * The importer code is responsible for dealing with processing changes based
+          on the image digest
+            * The image tag is not supplied as it is mutable - code should key off the
+              digest
+    * Create the Spark session
+        * Add a zip of dependency python code
+        * Only python supported
+    * Create a YAML file with
+        * The image name and digest
+        * Input file locations in S3
+        * Program arguments
+            * Not strictly necessary, but some importers may need to key off
+              arguments
+     * Run the python code via the Spark session with the YAML file as input
 * Develop a library of helper functions for performing `MERGE` inserts into the Deltalake tables
+    * Will be used in most importers
+    * Perhaps one already exists
 
+### Error handling
+
+* After a specified number of failures for processing a job's output, the Kafka message, with
+  new fields including the error message and stacktrace, will be sent to a Kafka deal letter
+  queue (DLQ).
+* For now manual processing will be required to examine the messages and start an event processor
+  pointed at the DLQ.
+* A Kafka DLQ, as opposed to a database entry, makes it easy to reprocess failed events.
+* In the future we may want to add the ability for the event processor to automatically shut
+  down if it adds too many events to the DLQ in a row, or detects consistent connection failures
+  to the Spark cluster or S3.
 
 ## Testing
 
@@ -109,9 +117,9 @@ required the installation requirements are too high to run via local installs.
 
 * The event processor will need to run import code based on the job's Docker image. It will
   need a mapping from job image -> code to run.
-* The code to run will need to follow a specific input API as described in `Design`
-* There will need to be some way for the event processor to get access to the code to run
-* Could start with a simpler implementation and add more complex options later if required
+* The code to run will need to follow a specific input API as described in `Design`.
+* There will need to be some way for the event processor to get access to the code to run.
+* We could start with a simpler implementation and add more complex options later if required
     * If we don't expect frequent importer updates, a simpler option is probably better
     * If we expect 3rd parties to frequently add / update importer code, dynamic
       update may be needed
@@ -122,7 +130,7 @@ required the installation requirements are too high to run via local installs.
 * Simplest implementation
 * Maintain a single dependencies file (pipenv / uv / ...)
     * Install and zip the dependencies at build time
-    * Provide to spark session creating the Kafka stream
+    * Provide to spark session for each job
 * Easy to run integration tests on the importer code
 * More complexity for importer authors to deal with
 * More PRs for the event processor repo owner to review
@@ -132,7 +140,7 @@ required the installation requirements are too high to run via local installs.
 * Isolates the event processor from the importer code
 * Maintain a single dependencies file (pipenv / uv / ...)
     * Install and zip the dependencies at build time
-    * Provide to spark session creating the Kafka stream
+    * Provide to spark session for each job
 * Difficult to run integration tests on the importer code
     * May be possible by cloning the event repo in GHA and building the event processor
       image
@@ -146,7 +154,7 @@ required the installation requirements are too high to run via local installs.
 * Isolates various importers from each other
 * Multiple dependency files (pipenv / uv / ...)
     * Install and zip each module's dependencies separately at build time
-    * Provide all dependency zips to the spark session creating the Kafka stream
+    * Provide the correct dependency zip for each job
 * Difficult to run integration tests on the importer code
     * May be possible by cloning the event repo in GHA and building the event processor
       image
@@ -156,13 +164,11 @@ required the installation requirements are too high to run via local installs.
 
 ### 4. Dynamically update importers from external repo(s)
 * As option 2 or 3, but updates repo dynamically without requiring an image rebuild
+    * Check would occur as part of event loop
 * May need a location to dynamically pull configuration in order to add new importer repos without
   redeployment
+    * Perhaps a configuration file in S3
 * Increases risk of malicious code injection over option 3
-* Not sure how to implement this, would need research. Appears as though the spark session
-  would need to be stopped and recreated with new zip files of dependencies. Need to figure out
-  how to break out of the event loop, clone the repos, rebuild the dependencies, and restart the
-  loop.
 
 ## Implications for the CTS
 
@@ -181,8 +187,8 @@ required the installation requirements are too high to run via local installs.
 ## Requirements for importer authors
 
 * Importer authors making use of the CDM events processor must implement importers expecting that
-  the same event may be processed multiple times. Both the CTS and Spark Streaming with a
-  `forEach` data sink only guarantee at-least-once event processing.
+  the same event may be processed multiple times. The CTS only guarantees at-least-once
+  event processing.
     * The [MERGE](https://docs.databricks.com/gcp/en/delta/merge) SQL statement
       is one way to ensure duplicate data is not entered into the CDM.
 * Importer authors must ensure their code covers different versions of registered CTS images.
