@@ -44,7 +44,7 @@ jobs:
 
     - name: Run tests
       shell: bash
-      run: PYTHONPATH=. pytest --cov=cdmtaskservice --cov-report=xml test
+      run: PYTHONPATH=. pytest --cov=cdmsparkevents --cov-report=xml test
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
