@@ -177,4 +177,12 @@ services:
       KBCTS_KAFKA_STARTUP_UNSENT_MSG_DELAY_MIN: 5
       KBCTS_SKIP_NERSC: true
 
-  # TODO TEST add event processor container
+  cdm_events:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - postgres
+      - cdm_task_service
+      - spark-worker-1
+      - spark-worker-2
