@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 ghcr.io/kbase/cdm-spark-standalone:pr-25
+FROM --platform=linux/amd64 ghcr.io/kbase/cdm-spark-standalone:pr-28
 
 USER root
 
