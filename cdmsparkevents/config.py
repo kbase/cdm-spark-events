@@ -14,12 +14,14 @@ class Config(BaseSettings):
         validation_alias="CSEP_KAFKA_BOOTSTRAP_SERVERS",
         example="localhost:9092",
         description="The comma separated bootstrap servers list for Kafka.",
+        min_length=1,
     )]
     kafka_topic_jobs: Annotated[str,  Field(
         validation_alias="CSEP_KAFKA_TOPIC_JOBS",
         example="cts-jobs",
         description="The Kafka topic to listen to for CDM Task Service jobs. Follows the "
             + "standard rules for topic names other than periods and underscores are not allowed.",
+        min_length=1,
         max_length=249,
         pattern=r"^[a-zA-Z0-9-]+$",
     )]
@@ -29,6 +31,7 @@ class Config(BaseSettings):
         description="The group ID to use for the Kafka consumer. It is important to read up "
             + "on Kafka consumer groups operation and parallelism if this topic is not well "
             + "understood.",
+        min_length=1,
     )]
     kafka_max_poll_interval_ms: Annotated[int, Field(
         validation_alias="CSEP_KAFKA_MAX_POLL_INTERVAL_MS",
