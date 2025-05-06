@@ -4,10 +4,13 @@ Configuration for the event handler.
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Annotated
+from typing import Annotated, Any
 
 
 class Config(BaseSettings):
+    """
+    The configuration for the CDM events processor.
+    """
     model_config = SettingsConfigDict(case_sensitive=True, str_strip_whitespace=True)
     
     kafka_bootstrap_servers: Annotated[str, Field(
@@ -41,3 +44,16 @@ class Config(BaseSettings):
             + "event processing job.",
         gt=0,
     )] = 3600 * 1000
+    
+    _SAFE_FIELDS = {
+        "kafka_bootstrap_servers", 
+        "kafka_topic_jobs",
+        "kafka_group_id",
+        "kafka_max_poll_interval_ms"
+    }
+    
+    def safe_dump(self) -> dict[str, Any]:
+        """
+        Return the settings as a dictionary with any sensitive fields (passwords, etc.) redacted.
+        """
+        return {k: v for k, v in self.model_dump().items() if k in self._SAFE_FIELDS}
