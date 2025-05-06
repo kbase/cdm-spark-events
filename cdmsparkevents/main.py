@@ -4,8 +4,12 @@ Main class for the events system. Gets the config and starts the event loop.
 
 from kafka import KafkaConsumer
 
+from cdmsparkevents.config import Config
+
+
 def main():
-    print("Hello to all the little people that made this possible")
+    cfg = Config()
+    print(cfg)
 
 
 if __name__ == "__main__":
