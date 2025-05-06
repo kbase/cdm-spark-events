@@ -30,7 +30,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "kafka-python", specifier = "==2.2.2" },
+    { name = "kafka-python", specifier = "==2.2.4" },
     { name = "pydantic-settings", specifier = "==2.9.1" },
     { name = "pyspark", specifier = "==3.5.5" },
     { name = "python-json-logger", specifier = "==3.3.0" },
@@ -117,11 +117,11 @@ wheels = [
 
 [[package]]
 name = "kafka-python"
-version = "2.2.2"
+version = "2.2.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1b/28/458d5034b846013bcc78f40b3ecc698e4101844b2013df343223581ca5d6/kafka_python-2.2.2.tar.gz", hash = "sha256:ca413b61228169ee45d7855e87dad3924663c3a82fd4d190506e923dddf04cb8", size = 344291, upload-time = "2025-04-30T17:46:36.527Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/16/1050df8c09d5b686e732cd4bb0fdb7ff944204bd3c71fe7b82b41b7657a4/kafka_python-2.2.4.tar.gz", hash = "sha256:e4b892e9b5fbc1fcb980d064caad5d506ede64205847acbcb4953d4980c7cfd7", size = 344670, upload-time = "2025-05-04T03:05:37.315Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/b6/24823f71d4eb2045398a2c528ae91a8ddda72050f5088d59f9c8ea9b3000/kafka_python-2.2.2-py2.py3-none-any.whl", hash = "sha256:ae3877bf42ce5815c50da7fac26c9183df404e0a25ad7c4e44648bb14b466d53", size = 307256, upload-time = "2025-04-30T17:46:32.659Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/5e/986778d3be7e6482b381891b6f37606daa7dc536ce1d528d2cc693454ec5/kafka_python-2.2.4-py2.py3-none-any.whl", hash = "sha256:ad96948af44a97f2daafad5ed0bb5787f1d137a864b249b3bc7aa35adbe94c79", size = 308153, upload-time = "2025-05-04T03:05:34.742Z" },
 ]
 
 [[package]]

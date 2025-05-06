@@ -17,8 +17,11 @@ RUN uv sync --locked --inexact --no-dev
 RUN mkdir /csep
 
 COPY cdmsparkevents /csep/cdmsparkevents
+COPY test/manual /csep/test/manual
 
 ENV PYTHONPATH=/csep
+
+WORKDIR /csep
 
 USER spark_user
 
