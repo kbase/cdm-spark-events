@@ -14,10 +14,12 @@ COPY pyproject.toml uv.lock .python-version .
 ENV UV_PROJECT_ENVIRONMENT=/opt/bitnami/python
 RUN uv sync --locked --inexact --no-dev
 
-COPY cdmsparkevents /cdmsparkevents
+RUN mkdir /csep
 
-ENV PYTHONPATH=/
+COPY cdmsparkevents /csep/cdmsparkevents
+
+ENV PYTHONPATH=/csep
 
 USER spark_user
 
-ENTRYPOINT ["python", "/cdmsparkevents/main.py"]
+ENTRYPOINT ["python", "/csep/cdmsparkevents/main.py"]
