@@ -8,7 +8,7 @@ from pythonjsonlogger.core import RESERVED_ATTRS
 from pythonjsonlogger.json import JsonFormatter
 
 from cdmsparkevents.config import Config
-from cdmsparkevents.eventloop import run_event_loop
+from cdmsparkevents.eventloop import EventLoop
 
 
 # httpx is super chatty if the root logger is set to INFO
@@ -52,7 +52,7 @@ def main():
     # Can't use __name__ here since we're expecting to be run as a script, where the name is just
     # __main__
     logging.getLogger("cdmsparkevents.main").info("Service configuration", extra=cfg.safe_dump())
-    run_event_loop(cfg)
+    EventLoop(cfg).start_event_loop()
 
 
 if __name__ == "__main__":
