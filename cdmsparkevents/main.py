@@ -52,7 +52,11 @@ def main():
     # Can't use __name__ here since we're expecting to be run as a script, where the name is just
     # __main__
     logging.getLogger("cdmsparkevents.main").info("Service configuration", extra=cfg.safe_dump())
-    EventLoop(cfg).start_event_loop()
+    evl = EventLoop(cfg)
+    try:
+        evl.start_event_loop()
+    finally:
+        evl.close()
 
 
 if __name__ == "__main__":
