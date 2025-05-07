@@ -197,6 +197,7 @@ services:
     environment:
       CSEP_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CSEP_KAFKA_TOPIC_JOBS:      cts-jobs     
+      CSEP_KAFKA_TOPIC_JOBS_DLQ: cts-jobs-dlq
       CSEP_KAFKA_GROUP_ID: cts_event_processors
       # If a consumer doesn't poll in this interval the broker will treat it as dead
       CSEP_KAFKA_MAX_POLL_INTERVAL_MS: 7200000

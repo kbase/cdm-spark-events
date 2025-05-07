@@ -25,8 +25,11 @@ def main():
         enable_idempotence=True,
         acks='all',
     )
-    fut = prod.send(cfg.kafka_topic_jobs, sys.argv[2].encode("utf-8"))
-    fut.get(timeout=10)  # ensure message is sent
+    try:
+        fut = prod.send(cfg.kafka_topic_jobs, sys.argv[2].encode("utf-8"))
+        fut.get(timeout=10)  # ensure message is sent
+    finally:
+        prod.close()
 
 
 if __name__ == "__main__":

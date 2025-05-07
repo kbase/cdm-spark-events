@@ -22,8 +22,20 @@ class Config(BaseSettings):
     kafka_topic_jobs: Annotated[str,  Field(
         validation_alias="CSEP_KAFKA_TOPIC_JOBS",
         example="cts-jobs",
-        description="The Kafka topic to listen to for CDM Task Service jobs. Follows the "
-            + "standard rules for topic names other than periods and underscores are not allowed.",
+        description="The Kafka topic to listen to for CDM Task Service job state updates. "
+            + "Follows the standard rules for topic names other than periods and underscores "
+            + "are not allowed due to ambiguities in how Kafka handles them.",
+        min_length=1,
+        max_length=249,
+        pattern=r"^[a-zA-Z0-9-]+$",
+    )]
+    kafka_topic_jobs_dlq: Annotated[str, Field(
+        validation_alias="CSEP_KAFKA_TOPIC_JOBS_DLQ",
+        example="cts-jobs-dlq",
+        description="The Kafka topic where CDM Task Service job state update messages should be "
+            + "sent if they failed to process, e.g. a Dead Letter Queue. "
+            + "Follows the standard rules for topic names other than periods and underscores "
+            + "are not allowed due to ambiguities in how Kafka handles them.",
         min_length=1,
         max_length=249,
         pattern=r"^[a-zA-Z0-9-]+$",
