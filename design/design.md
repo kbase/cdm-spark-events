@@ -128,8 +128,6 @@ required the installation requirements are too high to run via local installs.
     * If we expect 3rd parties to frequently add / update importer code, dynamic
       update may be needed
 
-**DECISION NEEDED**
-
 ### 1. Include the code in the event processor repo
 * Simplest implementation
 * Maintain a single dependencies file (pipenv / uv / ...)
@@ -174,6 +172,16 @@ required the installation requirements are too high to run via local installs.
     * Perhaps a configuration file in S3
 * Increases risk of malicious code injection over option 3
 
+### Decision
+
+Option 2 was chosen in the the CDM stand up meeting, 2025/05/08.
+
+The rationale is that we can provide a docker compose test file that's much simpler, with
+many fewer services, in the independent repo. This should make things easier for importer writers
+to understand the system they have to deal with and test their code.
+
+In the future we could investigate options 3 or 4 if the additional complexity seems necessary.
+
 ## Implications for the CTS
 
 * We may need to have a set of topics for jobs to separate jobs that are expected to 
@@ -205,3 +213,7 @@ required the installation requirements are too high to run via local installs.
     * At some point we will want to get alerts if the event processor goes down
 * Supporting multiple python versions
     * Only support 3.11 (or .12?) for now
+
+## Approval
+
+This design document was approved in the CDM Tech standup meeting, 2025/05/08.
