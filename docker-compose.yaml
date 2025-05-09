@@ -46,11 +46,16 @@ services:
       - 9000:9000
       - 9001:9001
     command: 'server /data --console-address ":9001"'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 1s
+      retries: 5
 
   minio-create-bucket:
     image: minio/mc
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     environment:
       MINIO_URL: http://minio:9000
       MINIO_USER: miniouser
