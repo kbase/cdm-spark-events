@@ -6,7 +6,7 @@ Assuming a docker compose context, invoke like:
 docker compose exec cdm_events python test/manual/send_kafka_message.py -t <message_text>
 """
 
-# TODO CTS send a message in CTS format
+# TODO CTS send a message in CTS format - eh, this is actually really easy as is. Probably YAGNI
 
 
 from kafka import KafkaProducer
