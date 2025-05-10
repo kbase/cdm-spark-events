@@ -56,16 +56,34 @@ class Config(BaseSettings):
             + "event processing job.",
         gt=0,
     )] = 3600 * 1000
+    cdm_task_service_url: Annotated[str, Field(
+        validation_alias="CSEP_CDM_TASK_SERVICE_URL",
+        example="https://ci.kbase.us/servies/cts",
+        description="The root URL of the CDM Task Service.",
+        min_length=1,
+    )]
+    # TODO SECURITY Could make another CTS admin level that only allows reading jobs
+    #               See https://kbase-jira.atlassian.net/browse/CDM-124
+    cdm_task_service_admin_token: Annotated[str, Field(
+        validation_alias="CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN",
+        description="A CDM task service token that allows reading all jobs.",
+        min_length=1,
+    )]
     
     _SAFE_FIELDS = {
         "kafka_bootstrap_servers", 
         "kafka_topic_jobs",
+        "kafka_topic_jobs_dlq",
         "kafka_group_id",
-        "kafka_max_poll_interval_ms"
+        "kafka_max_poll_interval_ms",
+        "cdm_task_service_url",
     }
     
     def safe_dump(self) -> dict[str, Any]:
         """
         Return the settings as a dictionary with any sensitive fields (passwords, etc.) redacted.
         """
-        return {k: v for k, v in self.model_dump().items() if k in self._SAFE_FIELDS}
+        return {
+            k: v if k in self._SAFE_FIELDS else "REDACTED BY THE MINISTRY OF TRUTH"
+            for k, v in self.model_dump().items()
+        }

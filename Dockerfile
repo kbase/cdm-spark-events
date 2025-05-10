@@ -16,6 +16,7 @@ RUN uv sync --locked --inexact --no-dev
 
 RUN mkdir /csep
 
+COPY entrypoint.sh /csep/
 COPY cdmsparkevents /csep/cdmsparkevents
 COPY test/manual /csep/test/manual
 
@@ -25,4 +26,4 @@ WORKDIR /csep
 
 USER spark_user
 
-ENTRYPOINT ["python", "/csep/cdmsparkevents/main.py"]
+ENTRYPOINT ["/csep/entrypoint.sh"]

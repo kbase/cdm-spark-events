@@ -10,6 +10,7 @@ docker compose exec cdm_events python test/manual/send_kafka_message.py -t <mess
 
 
 from kafka import KafkaProducer
+import os
 import sys
 
 from cdmsparkevents.config import Config
@@ -19,6 +20,8 @@ def main():
     # TODO CTS use argparse when we have more than one argument
     if sys.argv[1] != "-t":
         raise ValueError(f"Unknown option: {sys.argv[1]}")
+    # prevent config errors if the token is passed via a file vs. env var
+    os.environ["CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN"] = "foo"
     cfg = Config()
     prod = KafkaProducer(
         bootstrap_servers=cfg.kafka_bootstrap_servers.split(","),
