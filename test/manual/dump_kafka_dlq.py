@@ -11,12 +11,15 @@ docker compose exec cdm_events python test/manual/dump_kafka_dlq.py
 
 
 from kafka import KafkaConsumer
+import os
 from pprint import pprint
 
 from cdmsparkevents.config import Config
 
 
 def main():
+    # prevent config errors if the token is passed via a file vs. env var
+    os.environ["CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN"] = "foo"
     cfg = Config()
     cons = KafkaConsumer(
         cfg.kafka_topic_jobs_dlq,
