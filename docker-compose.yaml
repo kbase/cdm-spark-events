@@ -1,5 +1,9 @@
 # This docker-compose is for developer convenience, not for running in production.
 
+volumes:
+
+  shared-token:
+
 services:
 
   postgres:  # for hive
@@ -42,11 +46,16 @@ services:
       - 9000:9000
       - 9001:9001
     command: 'server /data --console-address ":9001"'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 1s
+      retries: 5
 
   minio-create-bucket:
     image: minio/mc
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     environment:
       MINIO_URL: http://minio:9000
       MINIO_USER: miniouser
@@ -55,8 +64,7 @@ services:
       MINIO_CTS_PWD: ctspassword
     entrypoint: /s3_policies/minio_create_bucket_entrypoint.sh
     volumes:
-      - ./s3_policies/cdm-task-service-read-write-policy.json:/s3_policies/cdm-task-service-read-write-policy.json
-      - ./s3_policies/minio_create_bucket_entrypoint.sh:/s3_policies/minio_create_bucket_entrypoint.sh
+      - ./docker_compose/s3_policies:/s3_policies
 
   mongodb:
     image: mongo:7.0.14
@@ -81,6 +89,28 @@ services:
       - "/kb/deployment/bin/start_auth2.sh"
     depends_on:
       - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 1s
+      # https://github.com/kbase/auth2/issues/443
+      retries: 30
+
+  create_auth2_user:
+    build:  # yuck. If there's a better way to do this I'm all ears
+      context: ./docker_compose/create_auth_user
+      dockerfile: Dockerfile
+    depends_on:
+      auth2:
+        condition: service_healthy
+    environment:
+      AUTH_URL: http://auth2:8080
+      USER_NAME: cdm_event_processor
+      HAS_NERSC_ACCOUNT_ROLE: HAS_NERSC_ACCOUNT
+      KBASE_STAFF_ROLE: KBASE_STAFF
+      KBASE_AUTH2_ADMIN_ROLE: CDM_TASK_SERVICE_ADMIN
+      TOKEN_OUTFILE: /shared/token.txt
+    volumes:
+      - shared-token:/shared
 
   spark-master:
     image: ghcr.io/kbase/cdm-spark-standalone:pr-29
@@ -143,12 +173,20 @@ services:
     ports:
       - 5000:5000
     depends_on:
-      - mongodb
-      - minio-create-bucket
-      - kafka
-      - auth2
+      mongodb:
+        condition: service_started
+      minio-create-bucket:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+      auth2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 1s
+      retries: 5
     environment:
-      KBCTS_KBASE_AUTH2_URL: http://auth2:8080
+      KBCTS_KBASE_AUTH2_URL: http://auth2:8080/testmode/
       KBCTS_KBASE_AUTH2_ADMIN_ROLES: CDM_TASK_SERVICE_ADMIN
       KBCTS_KBASE_STAFF_ROLE: KBASE_STAFF
       KBCTS_HAS_NERSC_ACCOUNT_ROLE: HAS_NERSC_ACCOUNT
@@ -180,7 +218,6 @@ services:
       KBCTS_CONTAINER_S3_LOG_DIR: cts-logs/container_logs
       KBCTS_SERVICE_ROOT_URL: https://superduperfake.com
       KBCTS_SERVICE_GROUP: fake
-      KBCTS_KAFKA_STARTUP_UNSENT_MSG_DELAY_MIN: 5
       KBCTS_SKIP_NERSC: true
 
   cdm_events:
@@ -189,11 +226,18 @@ services:
       dockerfile: Dockerfile
     platform: linux/amd64
     depends_on:
-      - postgres
-      - cdm_task_service
-      - kafka
-      - spark-worker-1
-      - spark-worker-2
+      postgres:
+        condition: service_started
+      cdm_task_service:
+        condition: service_healthy
+      create_auth2_user:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+      spark-worker-1:
+        condition: service_started
+      spark-worker-2:
+        condition: service_started
     environment:
       CSEP_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CSEP_KAFKA_TOPIC_JOBS:      cts-jobs     
@@ -201,6 +245,10 @@ services:
       CSEP_KAFKA_GROUP_ID: cts_event_processors
       # If a consumer doesn't poll in this interval the broker will treat it as dead
       CSEP_KAFKA_MAX_POLL_INTERVAL_MS: 7200000
+      CSEP_CDM_TASK_SERVICE_URL: http://cdm_task_service:5000
+      # To configure an admin token directly use this env var
+      # CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN: token_here
+      CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN_FILE:        /shared/token.txt    
       SPARK_MASTER_URL: spark://spark-master:7077
       POSTGRES_USER: hive
       POSTGRES_PASSWORD: hivepassword
@@ -208,3 +256,5 @@ services:
       POSTGRES_URL: postgres:5432
       DATANUCLEUS_AUTO_CREATE_TABLES: true
     # TODO SPARK need to config hive template https://github.com/kbase/cdm-spark-standalone/blob/main/scripts/setup.sh#L56-L61
+    volumes:
+      - shared-token:/shared
