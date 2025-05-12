@@ -18,7 +18,6 @@ RUN mkdir /csep
 
 COPY entrypoint.sh /csep/
 COPY cdmsparkevents /csep/cdmsparkevents
-COPY test/manual /csep/test/manual
 
 ENV PYTHONPATH=/csep
 

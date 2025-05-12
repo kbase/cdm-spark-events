@@ -7,8 +7,11 @@ import json
 from kafka import KafkaConsumer, KafkaProducer, TopicPartition, OffsetAndMetadata
 from kafka.consumer.fetcher import ConsumerRecord
 import logging
+import requests
 import signal
+import time
 import threading
+from typing import Any
 
 from cdmsparkevents.config import Config
 
@@ -82,7 +85,10 @@ class EventLoop:
         """
         if not config:
             raise ValueError("config required")
+        self._log = logging.getLogger(__name__)
         self._cfg = config
+        self._headers = {"Authorization": f"Bearer {self._cfg.cdm_task_service_admin_token}"}
+        self._test_cts_connection()
         self._cons = consumer if consumer else get_kafka_consumer_from_config(config)
         try:
             self._dlq = dlq_producer if dlq_producer else get_kafka_dlq_producer_from_config(
@@ -90,9 +96,64 @@ class EventLoop:
             )
         except:
             self._cons.close()
-        self._log = logging.getLogger(__name__)
 
     _REQUIRED_JOB_MSG_FIELDS = {"job_id", "state"}  # don't need the other two for now
+
+    def _test_cts_connection(self):
+        self._log.info("Checking CTS connection")
+        res = self._cts_request("")
+        # TODO SOON Get rid of the prototype in the name and add a notes field or something so this
+        #           doesn't break later
+        if res.get("service_name") != "CDM Task Service Prototype":
+            self._log.error(f"Unexpected response from the CTS:\n{res}")
+            raise ValueError(
+                f"The CTS url {self._cfg.cdm_task_service_url} does not appear "
+                + "to point to the CTS service"
+            )
+        # test the token has admin privs
+        self._cts_request("admin/jobs?limit=1")
+        self._log.info("Done checking CTS connection")
+
+    def _request_job(self, job_id: str) -> dict[str, Any]:
+        return self._cts_request(f"admin/jobs/{job_id}")
+
+    def _cts_request(self, url_path: str) -> dict[str, Any]:
+        # may need to use requests-mock to test this fn
+        # This fn will probably need changes as we discover error modes we've missed or
+        # miscategorized as fatal or recoverable 
+        res = requests.get(self._cfg.cdm_task_service_url + "/" + url_path, headers=self._headers)
+        if 400 <= res.status_code < 500:
+            try:
+                err = res.json()
+            except Exception as e:
+                self._log.exception(f"Unparseable error response from the CTS:\n{res.text}")
+                raise _FatalError(
+                    f"Unparseable error response ({res.status_code}) from the CTS"
+                ) from e
+            if "error" not in err:
+                self._log.error(f"Unexpected error structure from the CTS:\n{err}")
+                raise _FatalError(
+                    f"Unexpected error structure, response ({res.status_code}) from the CTS"
+                )
+            if err["error"].get("appcode") == 40040:
+                raise _NoJobError()
+            self._log.error(f"Unrecoverable error response from the CTS:\n{err}")
+            raise _FatalError(f"Unrecoverable error response ({res.status_code}) from the CTS")
+        if res.status_code >= 500:
+            # There's some 5XX errors that probably aren't recoverable but I've literally never
+            # seem them in practice
+            self._log.error(f"Error response from the CTS:\n{res.text}")
+            raise _PotentiallyRecoverableError(
+                f"Error response ({res.status_code}) from the CTS"
+            )
+        if not (200 <= res.status_code < 300):
+            self._log.error(f"Unexpected response from the CTS:\n{res.text}")
+            raise _FatalError(f"Unexpected response ({res.status_code}) from the CTS")
+        try:
+            return res.json()
+        except Exception as e:
+            self._log.exception(f"Unparseable response from the CTS:\n{res.text}")
+            raise _FatalError("Unparseable response from the CTS") from e
 
     def _send_to_dlq_and_commit(self, msg: ConsumerRecord, new_value: bytes = None):
         fut = self._dlq.send(self._cfg.kafka_topic_jobs_dlq, new_value or msg.value)
@@ -112,6 +173,7 @@ class EventLoop:
         """
         Start the event loop.
         """
+        self._log.info("Starting event loop")
         while not shutdown_event.is_set():
             pollres = self._cons.poll(timeout_ms=1000)
             for _, messages in pollres.items():
@@ -130,7 +192,7 @@ class EventLoop:
         # https://www.confluent.io/blog/guide-to-consumer-offsets/
         try:
             val = json.loads(msg.value.decode("utf-8"))
-        except Exception as e:
+        except Exception:
             self._log.exception(f"Unable to deserialize message:\n{msg.value}")
             self._send_to_dlq_and_commit(msg)
             return
@@ -149,6 +211,14 @@ class EventLoop:
             return
         
         self._log.info(f"Processing completed CTS job {job_id}")
+        try:
+            job_info = self._get_job_info(job_id)
+        except _NoJobError:
+            self._log.error(f"No such job: {job_id}")
+            val["error_dlq"] = "No such job"
+            self._send_to_dlq_and_commit(msg, new_value=json.dumps(val).encode("utf-8"))
+            return
+        self._log.info(job_info)
     
         # TODO NEXT process message - pull job from CTS, etc.
         # TODO NEXT handle errors - put errored messages on DLQ. Add retries later
@@ -156,6 +226,37 @@ class EventLoop:
         
         self._commit(msg)
 
+    _EXP_BACKOFF = [1, 2, 5, 10, 30, 60, 120, 300, 600, -1]
+
+    def _get_job_info(self, job_id: str):
+        # If the CTS is unreachable, we don't want to keep sticking messages on the DLQ over and
+        # over. As such, we try for several minutes to get the job info and then throw an
+        # exception and bail out, stopping the event loop.
+        for slp in self._EXP_BACKOFF:
+            try:
+                return self._request_job(job_id)
+            except _NoJobError:
+                raise
+            except _FatalError:
+                raise
+            except Exception:
+                if slp > 0:
+                    self._log.info(f"Error contacting the CTS server, retrying in {slp}s")
+                    time.sleep(slp)
+        raise _FatalError(
+            f"Failed to connect to the CTS server after {len(self._EXP_BACKOFF) - 1} "
+            + f"attempts over {sum(self._EXP_BACKOFF) + 1}s, bailing out"
+        )
+
     def close(self):
         self._cons.close()
         self._dlq.close()
+
+
+class _NoJobError(Exception): pass
+
+
+class _PotentiallyRecoverableError(Exception): pass
+
+
+class _FatalError(Exception): pass
