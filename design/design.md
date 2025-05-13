@@ -143,6 +143,7 @@ required the installation requirements are too high to run via local installs.
 * Maintain a single dependencies file (pipenv / uv / ...)
     * Install and zip the dependencies at build time
     * Provide to spark session for each job
+    * This requirement has been removed - see Amended Decision below
 * Difficult to run integration tests on the importer code
     * May be possible by cloning the event repo in GHA and building the event processor
       image
@@ -181,6 +182,17 @@ many fewer services, in the independent repo. This should make things easier for
 to understand the system they have to deal with and test their code.
 
 In the future we could investigate options 3 or 4 if the additional complexity seems necessary.
+
+#### Amended Decision
+
+In the CDM standup meeting on 2025/05/13 we decided not to support distributing python dependencies
+to the workers:
+
+* The import code is expected to be simple - loading the data into a spark dataframe, performing
+  dataframe manipulations, etc. - nothing that would require unusual dependencies.
+* Any common libraries that are commonly used can be installed on the workers directly
+    * Requires worker restart to deploy new libraries.
+* Any unusual processing should happen in the Docker image / container run by the CTS.
 
 ## Implications for the CTS
 
