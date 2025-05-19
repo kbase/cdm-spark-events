@@ -11,11 +11,11 @@ else
   echo 'bucket cts-logs already exists'
 fi
 
-# make test-events bucket
-if ! mc ls minio/test-events 2>/dev/null; then
-  mc mb minio/test-events && echo 'Bucket test-events created'
+# make events bucket
+if ! mc ls minio/$MINIO_EVENTS_BUCKET 2>/dev/null; then
+  mc mb minio/$MINIO_EVENTS_BUCKET && echo "Bucket $MINIO_EVENTS_BUCKET created"
 else
-  echo 'bucket test-events already exists'
+  echo "bucket $MINIO_EVENTS_BUCKET already exists"
 fi
 
 # create policies

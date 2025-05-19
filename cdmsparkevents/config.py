@@ -87,6 +87,13 @@ class Config(BaseSettings):
         description="The Minio secret key.",
         min_length=1,
     )]
+    minio_startup_deltalake_self_test_bucket: Annotated[str, Field(
+        validation_alias="CSEP_MINIO_STARTUP_DELTALAKE_SELF_TEST_BUCKET",
+        example="test-bucket",
+        description="A bucket to use for running a self test on startup that checks deltalake "
+            + "read / write ability. If unset the self test is skipped. The test takes seconds "
+            + "to minutes to perform",
+    )]
     spark_master_url: Annotated[str, Field(
         validation_alias="CSEP_SPARK_MASTER_URL",
         example="https://spark.kbase.us",

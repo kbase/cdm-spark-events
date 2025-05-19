@@ -5,7 +5,7 @@ Set up a spark session for use by importers.
 import logging
 from pathlib import Path
 
-from cdmsparkevents.arg_checkers import check_num as _check_num
+from cdmsparkevents.arg_checkers import check_num as _check_num, require_string as _require_string
 from cdmsparkevents.config import Config
 from pyspark.conf import SparkConf
 from pyspark.sql import SparkSession
@@ -35,19 +35,28 @@ def _find_jars(cfg: Config):
     return ", ".join(results)
 
 
-def spark_session(cfg: Config, app_name: str, executor_cores: int = 1) -> SparkSession:
+def spark_session(
+        cfg: Config,
+        app_name: str,
+        executor_cores: int = 1,
+        delta_tables_s3_path = None,
+    ) -> SparkSession:
     """
     Generate a spark session for an importer.
     
     cfg - The event processor configuration.
     app_name - The name for the spark application. This should be unique among applications.
     executor_cores - the number of cores to use per executor.
+    delta_tables_s3_path - the path where delta tables should be stored in S3, starting with the
+        bucket. If not specified, any writes must specify the S3 location for the files - in
+        this case, the data files are treated as external by Spark SQL are are not deleted if
+        the their corresponding tables / database are deleted.
     """
     # Sourced from https://github.com/kbase/cdm-jupyterhub/blob/main/src/spark/utils.py
     # with fairly massive changes
     config = {
         # Basic config
-        "spark.app.name": app_name,
+        "spark.app.name": _require_string(app_name, "app_name"),
         # TODO SPARK will need to provide a partial function to the processor code
         # so they can choose the number of executor cores while taking advantage of the setup
         # here
@@ -74,6 +83,9 @@ def spark_session(cfg: Config, app_name: str, executor_cores: int = 1) -> SparkS
         
         # Hive config is set up in the base image
     }
+    
+    if delta_tables_s3_path:
+        config["spark.sql.warehouse.dir"] = f"s3a://{delta_tables_s3_path}"
     
     spark_conf = SparkConf().setAll(list(config.items()))
 
