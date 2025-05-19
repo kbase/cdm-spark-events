@@ -39,7 +39,6 @@ def spark_session(
         cfg: Config,
         app_name: str,
         executor_cores: int = 1,
-        delta_tables_s3_path = None,
     ) -> SparkSession:
     """
     Generate a spark session for an importer.
@@ -47,10 +46,6 @@ def spark_session(
     cfg - The event processor configuration.
     app_name - The name for the spark application. This should be unique among applications.
     executor_cores - the number of cores to use per executor.
-    delta_tables_s3_path - the path where delta tables should be stored in S3, starting with the
-        bucket. If not specified, any writes must specify the S3 location for the files - in
-        this case, the data files are treated as external by Spark SQL and are not deleted if
-        their corresponding tables / database are deleted.
     """
     # Sourced from https://github.com/kbase/cdm-jupyterhub/blob/main/src/spark/utils.py
     # with fairly massive changes
@@ -80,12 +75,10 @@ def spark_session(
         "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         "spark.databricks.delta.retentionDurationCheck.enabled": "false",
         "spark.sql.catalogImplementation": "hive",
+        "spark.sql.warehouse.dir": f"s3a://{cfg.deltalake_s3_warehouse_dir}"
         
         # Hive config is set up in the base image
     }
-    
-    if delta_tables_s3_path:
-        config["spark.sql.warehouse.dir"] = f"s3a://{delta_tables_s3_path}"
     
     spark_conf = SparkConf().setAll(list(config.items()))
 

@@ -87,12 +87,17 @@ class Config(BaseSettings):
         description="The Minio secret key.",
         min_length=1,
     )]
-    minio_startup_deltalake_self_test_bucket: Annotated[str, Field(
-        validation_alias="CSEP_MINIO_STARTUP_DELTALAKE_SELF_TEST_BUCKET",
-        example="test-bucket",
-        description="A bucket to use for running a self test on startup that checks deltalake "
-            + "read / write ability. If unset the self test is skipped. The test takes seconds "
-            + "to minutes to perform",
+    deltalake_s3_warehouse_dir: Annotated[str, Field(
+        validation_alias="CSEP_DELTALAKE_S3_WAREHOUSE_DIR",
+        example="deltalake-bucket/delta_lake_databases",
+        description="An S3 path, starting with the bucket, where deltalake databases will be "
+            + "stored.",
+        min_length=5,
+    )]
+    startup_deltalake_self_test: Annotated[bool, Field(
+        validation_alias="CSEP_STARTUP_DELTALAKE_SELF_TEST",
+        description="Whether to run a self test on startup that checks deltalake "
+            + "read / write ability. The test takes seconds to minutes to perform",
     )]
     spark_master_url: Annotated[str, Field(
         validation_alias="CSEP_SPARK_MASTER_URL",
@@ -124,6 +129,8 @@ class Config(BaseSettings):
         "cdm_task_service_url",
         "minio_url",
         "minio_access_key",
+        "deltalake_s3_warehouse_dir",
+        "startup_deltalake_self_test",
         "spark_master_url",
         "spark_driver_host",
         "spark_jars_dir",
