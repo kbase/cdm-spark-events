@@ -49,8 +49,8 @@ def spark_session(
     executor_cores - the number of cores to use per executor.
     delta_tables_s3_path - the path where delta tables should be stored in S3, starting with the
         bucket. If not specified, any writes must specify the S3 location for the files - in
-        this case, the data files are treated as external by Spark SQL are are not deleted if
-        the their corresponding tables / database are deleted.
+        this case, the data files are treated as external by Spark SQL and are not deleted if
+        their corresponding tables / database are deleted.
     """
     # Sourced from https://github.com/kbase/cdm-jupyterhub/blob/main/src/spark/utils.py
     # with fairly massive changes
