@@ -1,8 +1,4 @@
-#!/bin/sh
-
-# TODO SPARK set up the spark environment. Not sure if everything in /opt/scripts/setup.sh
-# needs to run, but at minimum the hive setup is necessary
-
+#!/bin/bash
 
 # Function to trim whitespace
 trim() {
@@ -35,6 +31,9 @@ else
   export CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN="$token"
   echo "Loaded token from $CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN_FILE into environment."
 fi
+
+# Set up the spark environment
+. /opt/scripts/setup.sh
 
 # exec is needed to replace the shell script as PID 1 so it can recieve sigterm / sigint etc.
 exec python /csep/cdmsparkevents/main.py

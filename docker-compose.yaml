@@ -62,6 +62,8 @@ services:
       MINIO_PWD: miniopassword
       MINIO_CTS_USER: cts
       MINIO_CTS_PWD: ctspassword
+      MINIO_EVENTS_USER: events
+      MINIO_EVENTS_PWD: eventspassword
     entrypoint: /s3_policies/minio_create_bucket_entrypoint.sh
     volumes:
       - ./docker_compose/s3_policies:/s3_policies
@@ -95,7 +97,7 @@ services:
       # https://github.com/kbase/auth2/issues/443
       retries: 30
 
-  create_auth2_user:
+  create-auth2-user:
     build:  # yuck. If there's a better way to do this I'm all ears
       context: ./docker_compose/create_auth_user
       dockerfile: Dockerfile
@@ -167,7 +169,7 @@ services:
       POSTGRES_URL: postgres:5432
       DATANUCLEUS_AUTO_CREATE_TABLES: true
 
-  cdm_task_service:
+  cdm-task-service:
     image: ghcr.io/kbase/cdm-task-service:pr-324
     platform: linux/amd64
     ports:
@@ -222,7 +224,8 @@ services:
     volumes:
       - ./docker_compose/cts_helpers:/cts_helpers
 
-  cdm_events:
+  cdm-events:  # do not use underscore or spark will barf
+    user: root
     build:
       context: .
       dockerfile: Dockerfile
@@ -230,9 +233,9 @@ services:
     depends_on:
       postgres:
         condition: service_started
-      cdm_task_service:
+      cdm-task-service:
         condition: service_healthy
-      create_auth2_user:
+      create-auth2-user:
         condition: service_completed_successfully
       kafka:
         condition: service_started
@@ -247,15 +250,25 @@ services:
       CSEP_KAFKA_GROUP_ID: cts_event_processors
       # If a consumer doesn't poll in this interval the broker will treat it as dead
       CSEP_KAFKA_MAX_POLL_INTERVAL_MS: 7200000
-      CSEP_CDM_TASK_SERVICE_URL: http://cdm_task_service:5000
+      CSEP_CDM_TASK_SERVICE_URL: http://cdm-task-service:5000
       # To configure an admin token directly use this env var
       # CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN: token_here
       CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN_FILE:        /shared/token.txt    
-      SPARK_MASTER_URL: spark://spark-master:7077
+      CSEP_MINIO_URL: http://minio:9000
+      CSEP_MINIO_ACCESS_KEY: events
+      CSEP_MINIO_SECRET_KEY: eventspassword
+      CSEP_SPARK_MASTER_URL: spark://spark-master:7077
+      CSEP_SPARK_DRIVER_HOST: cdm-events
+
+      # The following are configuration parameters recognized by the spark base image rather
+      # than the CSEP itself
+      # See https://github.com/kbase/cdm-spark-standalone/blob/main/scripts/setup.sh
+      # for other optional variables
       POSTGRES_USER: hive
       POSTGRES_PASSWORD: hivepassword
       POSTGRES_DB: hive
       POSTGRES_URL: postgres:5432
+      # set to false for production use
       DATANUCLEUS_AUTO_CREATE_TABLES: true
     # TODO SPARK need to config hive template https://github.com/kbase/cdm-spark-standalone/blob/main/scripts/setup.sh#L56-L61
     volumes:
