@@ -62,6 +62,7 @@ services:
       MINIO_PWD: miniopassword
       MINIO_CTS_USER: cts
       MINIO_CTS_PWD: ctspassword
+      MINIO_EVENTS_BUCKET: test-events
       MINIO_EVENTS_USER: events
       MINIO_EVENTS_PWD: eventspassword
     entrypoint: /s3_policies/minio_create_bucket_entrypoint.sh
@@ -257,6 +258,8 @@ services:
       CSEP_MINIO_URL: http://minio:9000
       CSEP_MINIO_ACCESS_KEY: events
       CSEP_MINIO_SECRET_KEY: eventspassword
+      # comment out to skip startup test
+      CSEP_MINIO_STARTUP_DELTALAKE_SELF_TEST_BUCKET: test-events
       CSEP_SPARK_MASTER_URL: spark://spark-master:7077
       CSEP_SPARK_DRIVER_HOST: cdm-events
 
