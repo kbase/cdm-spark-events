@@ -69,7 +69,45 @@ class Config(BaseSettings):
         description="A CDM task service token that allows reading all jobs.",
         min_length=1,
     )]
-    
+    minio_url: Annotated[str, Field(
+        validation_alias="CSEP_MINIO_URL",
+        example="https://minio.kbase.us",
+        description="The root URL of the Minio instance for storing data.",
+        min_length=1,
+    )]
+    minio_access_key: Annotated[str, Field(
+        validation_alias="CSEP_MINIO_ACCESS_KEY",
+        example="my_minio_user",
+        description="The Minio access key.",
+        min_length=1,
+    )]
+    minio_secret_key: Annotated[str, Field(
+        validation_alias="CSEP_MINIO_SECRET_KEY",
+        example="supersekrit",
+        description="The Minio secret key.",
+        min_length=1,
+    )]
+    spark_master_url: Annotated[str, Field(
+        validation_alias="CSEP_SPARK_MASTER_URL",
+        example="https://spark.kbase.us",
+        description="The root URL of the Spark cluster master.",
+        min_length=1,
+    )]
+    spark_driver_host: Annotated[str, Field(
+        validation_alias="CSEP_SPARK_DRIVER_HOST",
+        example="event-processor-1.kbase.us",
+        description="The drive host, e.g. the host on which the event processor is running.",
+        min_length=1,
+    )]
+    spark_jars_dir: Annotated[str, Field(
+        validation_alias="CSEP_SPARK_JARS_DIR",
+        example="/opt/bitnami/spark/jars",
+        description="The path to the Spark jars directory. This environment variable is "
+            + "typically provided by the Docker container in which the event processor is "
+            + "running.",
+        min_length=1,
+    )]
+
     _SAFE_FIELDS = {
         "kafka_bootstrap_servers", 
         "kafka_topic_jobs",
@@ -77,6 +115,11 @@ class Config(BaseSettings):
         "kafka_group_id",
         "kafka_max_poll_interval_ms",
         "cdm_task_service_url",
+        "minio_url",
+        "minio_access_key",
+        "spark_master_url",
+        "spark_driver_host",
+        "spark_jars_dir",
     }
     
     def safe_dump(self) -> dict[str, Any]:

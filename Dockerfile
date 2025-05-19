@@ -25,4 +25,6 @@ WORKDIR /csep
 
 USER spark_user
 
+ENV CSEP_SPARK_JARS_DIR=/opt/bitnami/spark/jars
+
 ENTRYPOINT ["/csep/entrypoint.sh"]
