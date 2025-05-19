@@ -22,8 +22,6 @@ def run_deltalake_startup_test(cfg: Config):
     cfg - The event processor configuration.
     """
     logr = logging.getLogger(__name__)
-    if not cfg.minio_startup_deltalake_self_test_bucket:
-        raise ValueError("A startup test bucket must be provided in the configuration")
     name = "cdm_events_startup_test_" + str(uuid.uuid4()).replace("-", "_")
     schema = StructType([
        StructField("employee_id", IntegerType(), nullable=False),
@@ -37,11 +35,7 @@ def run_deltalake_startup_test(cfg: Config):
         Row(employee_id=1, employee_name="Alice"),
         Row(employee_id=2, employee_name="Bob")
     ]
-    spark = spark_session(
-        cfg,
-        name,
-        delta_tables_s3_path=f"{cfg.minio_startup_deltalake_self_test_bucket}/cdm_events_self_test"
-    )
+    spark = spark_session(cfg, name)
     df = spark.createDataFrame(data, schema=schema)
     logr.info(f"Creating self test database {name}")
     spark.sql(f"CREATE DATABASE {name}")

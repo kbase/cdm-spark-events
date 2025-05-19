@@ -53,7 +53,7 @@ def main():
     # Can't use __name__ here since we're expecting to be run as a script, where the name is just
     # __main__
     logging.getLogger("cdmsparkevents.main").info("Service configuration", extra=cfg.safe_dump())
-    if cfg.minio_startup_deltalake_self_test_bucket:
+    if cfg.startup_deltalake_self_test:
         run_deltalake_startup_test(cfg)
     evl = EventLoop(cfg)
     try:
