@@ -3,17 +3,21 @@ The main event loop for the event handler.
 """
 
 
+import importlib
 import json
 from kafka import KafkaConsumer, KafkaProducer, TopicPartition, OffsetAndMetadata
 from kafka.consumer.fetcher import ConsumerRecord
 import logging
+from pyspark.sql import SparkSession
 import requests
 import signal
 import time
+import uuid
 import threading
 from typing import Any
 
 from cdmsparkevents.config import Config
+from cdmsparkevents.spark import spark_session
 
 
 def get_kafka_consumer_from_config(config: Config) -> KafkaConsumer:
@@ -97,7 +101,7 @@ class EventLoop:
         except:
             self._cons.close()
 
-    _REQUIRED_JOB_MSG_FIELDS = {"job_id", "state"}  # don't need the other two for now
+    _REQUIRED_CTS_JOB_MSG_FIELDS = {"job_id", "state"}  # don't need the other two for now
 
     def _test_cts_connection(self):
         self._log.info("Checking CTS connection")
@@ -196,7 +200,11 @@ class EventLoop:
             self._log.exception(f"Unable to deserialize message:\n{msg.value}")
             self._send_to_dlq_and_commit(msg)
             return
-        if self._REQUIRED_JOB_MSG_FIELDS - val.keys():
+        if val.get("special_event_type") == "integration_test":
+            self._run_integration_test(val)
+            self._commit(msg)
+            return
+        if self._REQUIRED_CTS_JOB_MSG_FIELDS - val.keys():
             err = f"Message has missing required keys:\n{val}"
             self._log.error(err)
             val["error_dlq"] = err
@@ -219,6 +227,8 @@ class EventLoop:
             self._send_to_dlq_and_commit(msg, new_value=json.dumps(val).encode("utf-8"))
             return
         self._log.info(job_info)
+        # TODO NEXT call _run_importer here after cutting down the job info to what's necessary
+        #           make sure to try / catch and dlq failures
     
         # TODO NEXT process message - pull job from CTS, etc.
         # TODO NEXT handle errors - put errored messages on DLQ. Add retries later
@@ -247,6 +257,24 @@ class EventLoop:
             f"Failed to connect to the CTS server after {len(self._EXP_BACKOFF) - 1} "
             + f"attempts over {sum(self._EXP_BACKOFF) + 1}s, bailing out"
         )
+        
+    def _run_integration_test(self, val: dict[str, Any]):
+        app_prefix = val.get("app_name_prefix") or "integration_test"
+        app_name = f"{app_prefix}_{uuid.uuid4()}"
+        self._log.info(f"Running integration test with app {app_name}")
+        try:
+            self._run_importer("cdmsparkevents.selftest.integration", app_name, val)
+        except Exception as e:
+            self._log.exception(
+                f"Integration test failed for {app_name}: {e}",
+                extra={"event": val},
+            )
+
+    def _run_importer(self, importer_module: str, app_name: str, job_info: dict[str, Any]):
+        mod = importlib.import_module(importer_module)
+        def get_spark(executor_cores: int = 1) -> SparkSession:
+            return spark_session(self._cfg, app_name, executor_cores=executor_cores)
+        mod.run_import(get_spark, job_info)
 
     def close(self):
         self._cons.close()

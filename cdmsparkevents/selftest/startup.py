@@ -36,28 +36,31 @@ def run_deltalake_startup_test(cfg: Config):
         Row(employee_id=2, employee_name="Bob")
     ]
     spark = spark_session(cfg, name)
-    df = spark.createDataFrame(data, schema=schema)
-    logr.info(f"Creating self test database {name}")
-    spark.sql(f"CREATE DATABASE {name}")
     try:
-        logr.info("Writing to self test database")
-        df.write.mode(
-            "overwrite"
-            ).option("compression", "snappy"
-            ).format("delta"
-            ).saveAsTable(f"{name}.employees"
-        )
-        logr.info("Querying self test database")
-        newdf = spark.sql(f"SELECT * FROM {name}.employees")
-        actual_data = newdf.orderBy("employee_id").collect()
-        if expected_data != actual_data:
-            raise ValueError(f"""The startup self test failed. Expected data:
-                {expected_data}
-                Actual data:
-                {actual_data}
-                """
+        df = spark.createDataFrame(data, schema=schema)
+        logr.info(f"Creating self test database {name}")
+        spark.sql(f"CREATE DATABASE {name}")
+        try:
+            logr.info("Writing to self test database")
+            df.write.mode(
+                "overwrite"
+                ).option("compression", "snappy"
+                ).format("delta"
+                ).saveAsTable(f"{name}.employees"
             )
+            logr.info("Querying self test database")
+            newdf = spark.sql(f"SELECT * FROM {name}.employees")
+            actual_data = newdf.orderBy("employee_id").collect()
+            if expected_data != actual_data:
+                raise ValueError(f"""The startup self test failed. Expected data:
+                    {expected_data}
+                    Actual data:
+                    {actual_data}
+                    """
+                )
+        finally:
+            logr.info(f"Dropping self test database {name}")
+            spark.sql(f"DROP DATABASE {name} CASCADE")
     finally:
-        logr.info(f"Dropping self test database {name}")
-        spark.sql(f"DROP DATABASE {name} CASCADE")
+        spark.stop()
     logr.info("Deltalake connectivity startup self test passed")

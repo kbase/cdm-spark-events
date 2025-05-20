@@ -12,6 +12,7 @@ from cdmsparkevents.eventloop import EventLoop
 from cdmsparkevents.selftest.startup import run_deltalake_startup_test
 
 
+# Spark logs are still not going through the JSON logger, don't worry about it for now
 # httpx is super chatty if the root logger is set to INFO
 logging.basicConfig(level=logging.WARNING)
 # https://stackoverflow.com/a/58777937/643675

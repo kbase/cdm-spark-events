@@ -97,7 +97,7 @@ class Config(BaseSettings):
     startup_deltalake_self_test: Annotated[bool, Field(
         validation_alias="CSEP_STARTUP_DELTALAKE_SELF_TEST",
         description="Whether to run a self test on startup that checks deltalake "
-            + "read / write ability. The test takes seconds to minutes to perform",
+            + "read / write ability. The test takes seconds to minutes to perform.",
     )]
     spark_master_url: Annotated[str, Field(
         validation_alias="CSEP_SPARK_MASTER_URL",
