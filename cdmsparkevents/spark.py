@@ -52,9 +52,6 @@ def spark_session(
     config = {
         # Basic config
         "spark.app.name": _require_string(app_name, "app_name"),
-        # TODO SPARK will need to provide a partial function to the processor code
-        # so they can choose the number of executor cores while taking advantage of the setup
-        # here
         # Overrides base image configuration
         "spark.executor.cores": f"{_check_num(executor_cores, 'executor_cores')}",
         "spark.driver.host": cfg.spark_driver_host,
