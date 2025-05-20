@@ -15,13 +15,13 @@ class Config(BaseSettings):
     
     kafka_bootstrap_servers: Annotated[str, Field(
         validation_alias="CSEP_KAFKA_BOOTSTRAP_SERVERS",
-        example="localhost:9092",
+        examples=["localhost:9092"],
         description="The comma separated bootstrap servers list for Kafka.",
         min_length=1,
     )]
     kafka_topic_jobs: Annotated[str,  Field(
         validation_alias="CSEP_KAFKA_TOPIC_JOBS",
-        example="cts-jobs",
+        examples=["cts-jobs"],
         description="The Kafka topic to listen to for CDM Task Service job state updates. "
             + "Follows the standard rules for topic names other than periods and underscores "
             + "are not allowed due to ambiguities in how Kafka handles them.",
@@ -31,7 +31,7 @@ class Config(BaseSettings):
     )]
     kafka_topic_jobs_dlq: Annotated[str, Field(
         validation_alias="CSEP_KAFKA_TOPIC_JOBS_DLQ",
-        example="cts-jobs-dlq",
+        examples=["cts-jobs-dlq"],
         description="The Kafka topic where CDM Task Service job state update messages should be "
             + "sent if they failed to process, e.g. a Dead Letter Queue. "
             + "Follows the standard rules for topic names other than periods and underscores "
@@ -42,7 +42,7 @@ class Config(BaseSettings):
     )]
     kafka_group_id: Annotated[str, Field(
         validation_alias="CSEP_KAFKA_GROUP_ID",
-        example="cdm_event_processor",
+        examples=["cdm_event_processor"],
         description="The group ID to use for the Kafka consumer. It is important to read up "
             + "on Kafka consumer groups operation and parallelism if this topic is not well "
             + "understood.",
@@ -50,7 +50,7 @@ class Config(BaseSettings):
     )]
     kafka_max_poll_interval_ms: Annotated[int, Field(
         validation_alias="CSEP_KAFKA_MAX_POLL_INTERVAL_MS",
-        example=300 * 1000,
+        examples=[300 * 1000],
         description="The time interval between polls that will cause the Kafka broker to "
             + "assume the consumer is dead. This value must be longer than the longest expected "
             + "event processing job.",
@@ -58,7 +58,7 @@ class Config(BaseSettings):
     )] = 3600 * 1000
     cdm_task_service_url: Annotated[str, Field(
         validation_alias="CSEP_CDM_TASK_SERVICE_URL",
-        example="https://ci.kbase.us/servies/cts",
+        examples=["https://ci.kbase.us/servies/cts"],
         description="The root URL of the CDM Task Service.",
         min_length=1,
     )]
@@ -71,25 +71,25 @@ class Config(BaseSettings):
     )]
     minio_url: Annotated[str, Field(
         validation_alias="CSEP_MINIO_URL",
-        example="https://minio.kbase.us",
+        examples=["https://minio.kbase.us"],
         description="The root URL of the Minio instance for storing data.",
         min_length=1,
     )]
     minio_access_key: Annotated[str, Field(
         validation_alias="CSEP_MINIO_ACCESS_KEY",
-        example="my_minio_user",
+        examples=["my_minio_user"],
         description="The Minio access key.",
         min_length=1,
     )]
     minio_secret_key: Annotated[str, Field(
         validation_alias="CSEP_MINIO_SECRET_KEY",
-        example="supersekrit",
+        examples=["supersekrit"],
         description="The Minio secret key.",
         min_length=1,
     )]
     deltalake_s3_warehouse_dir: Annotated[str, Field(
         validation_alias="CSEP_DELTALAKE_S3_WAREHOUSE_DIR",
-        example="deltalake-bucket/delta_lake_databases",
+        examples=["deltalake-bucket/delta_lake_databases"],
         description="An S3 path, starting with the bucket, where deltalake databases will be "
             + "stored.",
         min_length=5,
@@ -101,19 +101,19 @@ class Config(BaseSettings):
     )]
     spark_master_url: Annotated[str, Field(
         validation_alias="CSEP_SPARK_MASTER_URL",
-        example="https://spark.kbase.us",
+        examples=["https://spark.kbase.us"],
         description="The root URL of the Spark cluster master.",
         min_length=1,
     )]
     spark_driver_host: Annotated[str, Field(
         validation_alias="CSEP_SPARK_DRIVER_HOST",
-        example="event-processor-1.kbase.us",
+        examples=["event-processor-1.kbase.us"],
         description="The drive host, e.g. the host on which the event processor is running.",
         min_length=1,
     )]
     spark_jars_dir: Annotated[str, Field(
         validation_alias="CSEP_SPARK_JARS_DIR",
-        example="/opt/bitnami/spark/jars",
+        examples=["/opt/bitnami/spark/jars"],
         description="The path to the Spark jars directory. This environment variable is "
             + "typically provided by the Docker container in which the event processor is "
             + "running.",
