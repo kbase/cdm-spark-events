@@ -272,9 +272,16 @@ class EventLoop:
 
     def _run_importer(self, importer_module: str, app_name: str, job_info: dict[str, Any]):
         mod = importlib.import_module(importer_module)
-        def get_spark(executor_cores: int = 1) -> SparkSession:
-            return spark_session(self._cfg, app_name, executor_cores=executor_cores)
-        mod.run_import(get_spark, job_info)
+        sparkcapture = []
+        def get_spark(*, executor_cores: int = 1) -> SparkSession:
+            spark = spark_session(self._cfg, app_name, executor_cores=executor_cores)
+            sparkcapture.append(spark)
+            return spark
+        try:
+            mod.run_import(get_spark, job_info)
+        finally:
+            if sparkcapture:
+                sparkcapture[0].stop()
 
     def close(self):
         self._cons.close()

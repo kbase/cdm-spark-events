@@ -49,40 +49,37 @@ def run_import(get_spark: GetSpark, job_info: dict[str, Any]):
     mode = job_info.get("mode", "update")
     
     spark = get_spark()
-    try:
-        spark.sql(f"CREATE DATABASE IF NOT EXISTS {_DB_NAME}")
-        spark.sql(f"""
-            CREATE TABLE IF NOT EXISTS {_FULL_TABLE_NAME} (
-                employee_id INT,
-                employee_name STRING
-            )
-            USING DELTA
-            """
+    spark.sql(f"CREATE DATABASE IF NOT EXISTS {_DB_NAME}")
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {_FULL_TABLE_NAME} (
+            employee_id INT,
+            employee_name STRING
         )
+        USING DELTA
+        """
+    )
+
+    delta_table = DeltaTable.forName(spark, _FULL_TABLE_NAME)
     
-        delta_table = DeltaTable.forName(spark, _FULL_TABLE_NAME)
-        
-        # Alias for merge
-        target = "target"
-        source = "source"
-        
-        merge_condition = f"{target}.employee_id = {source}.employee_id"
-        
-        df = spark.createDataFrame(data, schema=_SCHEMA)
-        
-        preex = delta_table.alias(
-            target
-            ).merge(source=df.alias(source), condition=merge_condition
-            ).whenNotMatchedInsertAll(
-        )
-        if mode == "update":
-            preex = preex.whenMatchedUpdateAll()
-        preex.execute()
-        
-        current_table_df = spark.sql(f"SELECT * FROM {_FULL_TABLE_NAME}")
-        logr.info(
-            "Completed integration test. Current table contents:\n"
-            + f"{current_table_df.toPandas().to_string()}"
-        )
-    finally:
-        spark.stop()
+    # Alias for merge
+    target = "target"
+    source = "source"
+    
+    merge_condition = f"{target}.employee_id = {source}.employee_id"
+    
+    df = spark.createDataFrame(data, schema=_SCHEMA)
+    
+    preex = delta_table.alias(
+        target
+        ).merge(source=df.alias(source), condition=merge_condition
+        ).whenNotMatchedInsertAll(
+    )
+    if mode == "update":
+        preex = preex.whenMatchedUpdateAll()
+    preex.execute()
+    
+    current_table_df = spark.sql(f"SELECT * FROM {_FULL_TABLE_NAME}")
+    logr.info(
+        "Completed integration test. Current table contents:\n"
+        + f"{current_table_df.toPandas().to_string()}"
+    )
