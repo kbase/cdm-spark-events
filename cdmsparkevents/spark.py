@@ -72,9 +72,8 @@ def spark_session(
         "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         "spark.databricks.delta.retentionDurationCheck.enabled": "false",
         "spark.sql.catalogImplementation": "hive",
-        "spark.sql.warehouse.dir": f"s3a://{cfg.deltalake_s3_warehouse_dir}"
         
-        # Hive config is set up in the base image
+        # Hive & S3 warehouse dir config is set up in the base image
     }
     
     spark_conf = SparkConf().setAll(list(config.items()))

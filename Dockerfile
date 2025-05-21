@@ -1,4 +1,4 @@
-FROM ghcr.io/kbase/cdm-spark-standalone:pr-29
+FROM ghcr.io/kbase/cdm-spark-standalone:pr-32
 
 USER root
 
