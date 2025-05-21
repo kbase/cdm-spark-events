@@ -106,9 +106,7 @@ class EventLoop:
     def _test_cts_connection(self):
         self._log.info("Checking CTS connection")
         res = self._cts_request("")
-        # TODO SOON Get rid of the prototype in the name and add a notes field or something so this
-        #           doesn't break later
-        if res.get("service_name") != "CDM Task Service Prototype":
+        if res.get("service_name") != "CDM Task Service":
             self._log.error(f"Unexpected response from the CTS:\n{res}")
             raise ValueError(
                 f"The CTS url {self._cfg.cdm_task_service_url} does not appear "

@@ -171,7 +171,7 @@ services:
       DATANUCLEUS_AUTO_CREATE_TABLES: true
 
   cdm-task-service:
-    image: ghcr.io/kbase/cdm-task-service:pr-324
+    image: ghcr.io/kbase/cdm-task-service:pr-341
     platform: linux/amd64
     ports:
       - 5000:5000
