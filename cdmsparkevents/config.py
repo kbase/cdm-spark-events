@@ -87,13 +87,6 @@ class Config(BaseSettings):
         description="The Minio secret key.",
         min_length=1,
     )]
-    deltalake_s3_warehouse_dir: Annotated[str, Field(
-        validation_alias="CSEP_DELTALAKE_S3_WAREHOUSE_DIR",
-        examples=["deltalake-bucket/delta_lake_databases"],
-        description="An S3 path, starting with the bucket, where deltalake databases will be "
-            + "stored.",
-        min_length=5,
-    )]
     startup_deltalake_self_test: Annotated[bool, Field(
         validation_alias="CSEP_STARTUP_DELTALAKE_SELF_TEST",
         description="Whether to run a self test on startup that checks deltalake "
