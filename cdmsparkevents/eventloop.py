@@ -10,10 +10,8 @@ from kafka.consumer.fetcher import ConsumerRecord
 import logging
 from pyspark.sql import SparkSession
 import requests
-import signal
 import time
 import uuid
-import threading
 from typing import Any
 
 from cdmsparkevents.config import Config
@@ -49,18 +47,6 @@ def get_kafka_dlq_producer_from_config(config: Config) -> KafkaProducer:
         enable_idempotence=True,
         acks='all',
     )
-
-
-shutdown_event = threading.Event()
-
-
-def handle_signal(signum, frame):
-    logging.getLogger(__name__).info(f"Received signal {signum}, shutting down...")
-    shutdown_event.set()
-
-
-signal.signal(signal.SIGTERM, handle_signal)
-signal.signal(signal.SIGINT, handle_signal)
 
 
 class EventLoop:
@@ -176,7 +162,7 @@ class EventLoop:
         Start the event loop.
         """
         self._log.info("Starting event loop")
-        while not shutdown_event.is_set():
+        while True:
             pollres = self._cons.poll(timeout_ms=1000)
             for _, messages in pollres.items():
                 for msg in messages:

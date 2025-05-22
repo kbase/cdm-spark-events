@@ -2,6 +2,10 @@ FROM ghcr.io/kbase/cdm-spark-standalone:pr-32
 
 USER root
 
+RUN apt update \
+    && apt install -y tini \
+    && rm -rf /var/lib/apt/lists/* 
+
 RUN mkdir /uvinstall
 
 WORKDIR /uvinstall
@@ -27,4 +31,4 @@ USER spark_user
 
 ENV CSEP_SPARK_JARS_DIR=/opt/bitnami/spark/jars
 
-ENTRYPOINT ["/csep/entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "/csep/entrypoint.sh"]

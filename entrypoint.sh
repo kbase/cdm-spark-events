@@ -35,5 +35,4 @@ fi
 # Set up the spark environment
 . /opt/scripts/setup.sh
 
-# exec is needed to replace the shell script as PID 1 so it can recieve sigterm / sigint etc.
-exec python /csep/cdmsparkevents/main.py
+python /csep/cdmsparkevents/main.py
