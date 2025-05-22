@@ -1,17 +1,10 @@
-FROM ghcr.io/kbase/cdm-spark-standalone:pr-32
+FROM ghcr.io/kbase/cdm-spark-standalone:pr-34
 
 USER root
-
-RUN apt update \
-    && apt install -y tini \
-    && rm -rf /var/lib/apt/lists/* 
 
 RUN mkdir /uvinstall
 
 WORKDIR /uvinstall
-
-RUN pip install --upgrade pip && \
-    pip install uv
 
 COPY pyproject.toml uv.lock .python-version .
 
