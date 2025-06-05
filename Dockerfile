@@ -10,7 +10,7 @@ RUN cd /opt && \
     git checkout $IMPORTER_COMMIT && \
     echo $IMPORTER_COMMIT > ./git_commit
 
-FROM ghcr.io/kbase/cdm-spark-standalone:pr-34
+FROM ghcr.io/kbase/cdm-spark-standalone:pr-36
 
 USER root
 
