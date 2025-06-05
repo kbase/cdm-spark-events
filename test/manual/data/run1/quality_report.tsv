@@ -1,0 +1,3 @@
+Name	Completeness	Contamination	Completeness_Model_Used	Translation_Table_Used	Coding_Density	Contig_N50	Average_Gene_Length	Genome_Size	GC_Content	Total_Coding_Sequences	Total_Contigs	Max_Contig_Length	Additional_Notes
+GCA_replace	0.89	0.25	model3	7	0.47	148	0.48	44	0.91	34	3	14	hello
+GCA_ecoli	0.9	0.26	model4	8	0.48	149	0.49	45	0.92	35	4	15	

@@ -3,7 +3,7 @@ The main event loop for the event handler.
 """
 
 
-import importlib
+import datetime
 import json
 from kafka import KafkaConsumer, KafkaProducer, TopicPartition, OffsetAndMetadata
 from kafka.consumer.fetcher import ConsumerRecord
@@ -11,11 +11,17 @@ import logging
 from pyspark.sql import SparkSession
 import requests
 import time
-import uuid
+import traceback
+from types import ModuleType
 from typing import Any
+import uuid
 
 from cdmsparkevents.config import Config
+from cdmsparkevents.selftest import integration
 from cdmsparkevents.spark import spark_session
+
+
+INTEGRATION_TEST_MODULE_NAME = "*** run integration test please """
 
 
 def get_kafka_consumer_from_config(config: Config) -> KafkaConsumer:
@@ -57,6 +63,7 @@ class EventLoop:
     def __init__(
         self,
         config: Config,
+        importer_mappings: dict[str, tuple[ModuleType, dict[str, Any]]],
         consumer: KafkaConsumer = None,
         dlq_producer: KafkaProducer = None,
     ):
@@ -64,6 +71,9 @@ class EventLoop:
         Create the event loop with the given events processor configuration.
         
         config - the event processor configuration.
+        importer_mappings: a dictionary of CDM Task Service job images to a tuple of 
+            * the event importer main module to run for an import
+            * any metadata from the importer's yaml file.
         consumer - the consumer to use to read the CDM Task Service Kafka stream. If a consumer is
             not provided (recommended), it is generated via the get_kafka_consumer_from_config()
             method.
@@ -86,6 +96,8 @@ class EventLoop:
             )
         except:
             self._cons.close()
+        self._immap = dict(importer_mappings)  # don't alter the input
+        self._immap[INTEGRATION_TEST_MODULE_NAME] = (integration, {})
 
     _REQUIRED_CTS_JOB_MSG_FIELDS = {"job_id", "state"}  # don't need the other two for now
 
@@ -168,6 +180,14 @@ class EventLoop:
                 for msg in messages:
                     self._process_message(msg)
 
+    def _get_completion_time(self, job_info: dict[str, Any]) -> datetime.datetime:
+        # Should never have a job with > 1 completion event, but just in case
+        for tt in reversed(job_info["transition_times"]):
+            if tt["state"] == "complete":
+                return datetime.datetime.fromisoformat(tt["time"])
+        # this should be impossible, so we just bail out and end the event loop if it happens
+        raise ValueError(f"No complete event found for job {job_info['id']}")
+
     # TODO TEST write a test making sure that the offset commit is working correctly
     #           this could be tricky... need to start / stop the event loop. Manual testing
     #           appears to work
@@ -178,6 +198,7 @@ class EventLoop:
         # to reprocess the entire batch of messages from poll() if a failure occurs.
         # Note this may result in non-zero lag in some circumstances:
         # https://www.confluent.io/blog/guide-to-consumer-offsets/
+        # TODO CODE about time to split this up a bit, getting long
         try:
             val = json.loads(msg.value.decode("utf-8"))
         except Exception:
@@ -202,7 +223,7 @@ class EventLoop:
             self._commit(msg)
             return
         
-        self._log.info(f"Processing completed CTS job {job_id}")
+        self._log.info(f"Fetching completed CTS job {job_id}")
         try:
             job_info = self._get_job_info(job_id)
         except _NoJobError:
@@ -210,14 +231,34 @@ class EventLoop:
             val["error_dlq"] = "No such job"
             self._send_to_dlq_and_commit(msg, new_value=json.dumps(val).encode("utf-8"))
             return
-        self._log.info(job_info)
-        # TODO NEXT call _run_importer here after cutting down the job info to what's necessary
-        #           make sure to try / catch and dlq failures
-    
-        # TODO NEXT process message - pull job from CTS, etc.
-        # TODO NEXT handle errors - put errored messages on DLQ. Add retries later
-        # TODO NEXT set up spark context and run configured code based on image
-        
+        image = job_info["image"]["name"]
+        imp_job_info = {
+            "id": job_id,
+            "outputs": job_info["outputs"],
+            "image": image,
+            "image_digest": job_info["image"]["digest"],
+            "input_file_count": job_info["input_file_count"],
+            "output_file_count": job_info["output_file_count"],
+            "completion_time": self._get_completion_time(job_info),
+        }
+        self._log.info(
+            f"Running importer for CTS job {job_id}",
+            extra={"inf": {k: v for k, v in imp_job_info.items() if k != "outputs"}}
+        )
+        try:  # TODO Testing this stucks, write automated tests 
+            self._run_importer(image, f"job_id_{job_id}", job_id, imp_job_info)
+        except Exception as e:
+            # TODO RETRIES what it says <-
+            # TODO RELIABILITY if we see multiple errors in a row or a specific importer
+            #                  continually fails, shutdown?
+            # TODO RELIABILITY add helper methods to the importer repo for read / write retries
+            #                  Does spark handle this? Maybe we don't need retries
+            self._log.exception(f"Running import for job {job_id} failed: {e}")
+            val["error_dlq"] = str(e)
+            val["error_dlq_trace"] = traceback.format_exc()
+            self._send_to_dlq_and_commit(msg, new_value=json.dumps(val).encode("utf-8"))
+            return
+        self._log.info(f"Importer for CTS job {job_id} complete")
         self._commit(msg)
 
     _EXP_BACKOFF = [1, 2, 5, 10, 30, 60, 120, 300, 600, -1]
@@ -247,22 +288,30 @@ class EventLoop:
         app_name = f"{app_prefix}_{uuid.uuid4()}"
         self._log.info(f"Running integration test with app {app_name}")
         try:
-            self._run_importer("cdmsparkevents.selftest.integration", app_name, val)
+            self._run_importer(INTEGRATION_TEST_MODULE_NAME, app_name, None, val)
         except Exception as e:
             self._log.exception(
                 f"Integration test failed for {app_name}: {e}",
                 extra={"event": val},
             )
 
-    def _run_importer(self, importer_module: str, app_name: str, job_info: dict[str, Any]):
-        mod = importlib.import_module(importer_module)
+    def _run_importer(
+        self,
+        image: str,
+        app_name: str,
+        job_id: str,
+        job_info: dict[str, Any],
+    ):
+        mod = self._immap.get(image)
+        if not mod:
+            self._log.info(f"No importer mapped to image {image}, skipping job {job_id}")
         sparkcapture = []
         def get_spark(*, executor_cores: int = 1) -> SparkSession:
             spark = spark_session(self._cfg, app_name, executor_cores=executor_cores)
             sparkcapture.append(spark)
             return spark
         try:
-            mod.run_import(get_spark, job_info)
+            mod[0].run_import(get_spark, job_info, mod[1])
         finally:
             if sparkcapture:
                 sparkcapture[0].stop()

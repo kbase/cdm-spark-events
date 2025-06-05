@@ -4,7 +4,7 @@ pass Pydantic validation on its way out of the CTS.
 
 Assuming a docker compose context, invoke like:
 
-docker compose exec cdm_task_service python /cts_helpers/add_cts_job_to_mongo.py \
+docker compose exec cdm-task-service python /cts_helpers/add_cts_job_to_mongo.py \
     my_job_id complete ubuntu sha256:digest_here \
     mybucket/file1 crc1aaaaaaaa \
     mybucket/file2 crc2aaaaaaaa
@@ -82,6 +82,12 @@ def main():
                 "state": "created",
                 "time": now,
                 "trans_id": "tid",
+                "notif_sent": True,
+            },
+            {
+                "state": "complete",
+                "time": now,
+                "trans_id": "tid2",
                 "notif_sent": True,
             },
         ],
