@@ -3,9 +3,15 @@ Main class for the events system. Gets the config and starts the event loop.
 """
 
 import datetime
+import importlib
+import json
 import logging
+from logging import Logger
 from pythonjsonlogger.core import RESERVED_ATTRS
 from pythonjsonlogger.json import JsonFormatter
+import sys
+from types import ModuleType
+from typing import Any
 
 from cdmsparkevents.config import Config
 from cdmsparkevents.eventloop import EventLoop
@@ -47,16 +53,39 @@ handler.setFormatter(CustomJsonFormatter(
 ))
 rootlogger.addHandler(handler)
 logging.getLogger("cdmsparkevents").setLevel(logging.INFO)
+logging.getLogger("cdmeventimporters").setLevel(logging.INFO)
+
+
+def _load_mappings(logr: Logger) -> dict[str, tuple[ModuleType, dict[str, Any]]]:
+    ret = {}
+    mapping_file = sys.argv[1]
+    image2mod = []
+    with open(mapping_file) as f:
+        mappings = json.load(f)
+    for image, info in mappings.items():
+        modstr = info["mod"]
+        meta = info["meta"]
+        try:
+            mod = importlib.import_module(modstr)
+        except:
+            raise ValueError(f"Could not import module {mod} from yaml file {info['file']}")
+        # TODO IMPORTER_META may want to have some defined fields here, e.g. deltatable
+        ret[image] = (mod, meta)
+        image2mod.append({"image": image, "mod": modstr, "meta": meta})
+    logr.info("Loaded importer modules", extra={"modules": image2mod})
+    return ret
 
 
 def main():
     cfg = Config()
     # Can't use __name__ here since we're expecting to be run as a script, where the name is just
     # __main__
-    logging.getLogger("cdmsparkevents.main").info("Service configuration", extra=cfg.safe_dump())
+    logr = logging.getLogger("cdmsparkevents.main")
+    logr.info("Service configuration", extra=cfg.safe_dump())
+    importer_mappings = _load_mappings(logr)
     if cfg.startup_deltalake_self_test:
         run_deltalake_startup_test(cfg)
-    evl = EventLoop(cfg)
+    evl = EventLoop(cfg, importer_mappings)
     try:
         evl.start_event_loop()
     finally:

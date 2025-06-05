@@ -31,7 +31,7 @@ _SCHEMA = StructType([
 ])
 
 
-def run_import(get_spark: GetSpark, job_info: dict[str, Any]):
+def run_import(get_spark: GetSpark, job_info: dict[str, Any], metadata: dict[str, Any]):
     """
     Run the import code.
     
@@ -41,6 +41,8 @@ def run_import(get_spark: GetSpark, job_info: dict[str, Any]):
     job_info - a dict containing information about the job that was run that produced the
         data to import. NOTE - for this integration test the contents are not the same
         as for a CTS job event.
+    metadata - a dict containing metadata about the importer from the importer's yaml file.
+        NOTE -for the integration test this is empty.
     """
     # TODO DOCS documentation on the contents of job_info
     logr = logging.getLogger(__name__)

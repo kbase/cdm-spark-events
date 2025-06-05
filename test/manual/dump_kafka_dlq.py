@@ -4,7 +4,7 @@ to stdout.
 
 Assuming a docker compose context, invoke like:
 
-docker compose exec cdm_events python test/manual/dump_kafka_dlq.py
+docker compose exec cdm-events python test/manual/dump_kafka_dlq.py
 """
 
 # Probably some useful options we could add here, like a group ID to only see new messages, etc.

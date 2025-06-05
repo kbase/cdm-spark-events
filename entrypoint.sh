@@ -35,4 +35,4 @@ fi
 # Set up the spark environment
 . /opt/scripts/setup.sh
 
-python /csep/cdmsparkevents/main.py
+python /csep/cdmsparkevents/main.py "$@"

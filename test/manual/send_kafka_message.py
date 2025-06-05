@@ -3,7 +3,7 @@ Sends a message to the configured Kafka instance.
 
 Assuming a docker compose context, invoke like:
 
-docker compose exec cdm_events python test/manual/send_kafka_message.py -t <message_text>
+docker compose exec cdm-events python test/manual/send_kafka_message.py -t <message_text>
 """
 
 # TODO CTS send a message in CTS format - eh, this is actually really easy as is. Probably YAGNI
