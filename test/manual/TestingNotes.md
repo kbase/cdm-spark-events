@@ -5,7 +5,7 @@ Assumes docker compose is running.
 # Load test files to minio
 
 ```
-mc  cp --recursive --checksum crc64nvme test/manual/data/* local9000/test-events/testfiles/
+mc cp --recursive --checksum crc64nvme test/manual/data/* local9000/test-events/testfiles/
 ```
 
 # Add a job to the CTS

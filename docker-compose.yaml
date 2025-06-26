@@ -174,7 +174,7 @@ services:
       DELTALAKE_WAREHOUSE_DIR: s3a://test-events/deltalake_dbs
 
   cdm-task-service:
-    image: ghcr.io/kbase/cdm-task-service:pr-341
+    image: ghcr.io/kbase/cdm-task-service:pr-351
     platform: linux/amd64
     ports:
       - 5000:5000

@@ -23,6 +23,11 @@ from cdmsparkevents.spark import spark_session
 
 INTEGRATION_TEST_MODULE_NAME = "*** run integration test please """
 
+_CTS_META_KEY_BASE = "cse_event_processing_"
+_CTS_META_KEY_START = _CTS_META_KEY_BASE + "start"
+_CTS_META_KEY_COMPLETE = _CTS_META_KEY_BASE + "complete"
+_CTS_META_KEY_ERROR = _CTS_META_KEY_BASE + "error"
+
 
 def get_kafka_consumer_from_config(config: Config) -> KafkaConsumer:
     """
@@ -117,11 +122,19 @@ class EventLoop:
     def _request_job(self, job_id: str) -> dict[str, Any]:
         return self._cts_request(f"admin/jobs/{job_id}")
 
-    def _cts_request(self, url_path: str) -> dict[str, Any]:
+    def _cts_request(
+            self,
+            url_path: str,
+            body: dict[str, Any] = None,
+            no_response_body: bool = False) -> dict[str, Any]:
         # may need to use requests-mock to test this fn
         # This fn will probably need changes as we discover error modes we've missed or
-        # miscategorized as fatal or recoverable 
-        res = requests.get(self._cfg.cdm_task_service_url + "/" + url_path, headers=self._headers)
+        # miscategorized as fatal or recoverable
+        url = self._cfg.cdm_task_service_url + "/" + url_path
+        if body:
+            res = requests.put(url, json=body, headers=self._headers)
+        else:
+            res = requests.get(url, headers=self._headers)
         if 400 <= res.status_code < 500:
             try:
                 err = res.json()
@@ -149,6 +162,8 @@ class EventLoop:
         if not (200 <= res.status_code < 300):
             self._log.error(f"Unexpected response from the CTS:\n{res.text}")
             raise _FatalError(f"Unexpected response ({res.status_code}) from the CTS")
+        if no_response_body:
+            return None
         try:
             return res.json()
         except Exception as e:
@@ -245,6 +260,7 @@ class EventLoop:
             f"Running importer for CTS job {job_id}",
             extra={"inf": {k: v for k, v in imp_job_info.items() if k != "outputs"}}
         )
+        self._update_cts_meta(job_id, _CTS_META_KEY_START)
         try:  # TODO Testing this stucks, write automated tests 
             self._run_importer(image, f"job_id_{job_id}", job_id, imp_job_info)
         except Exception as e:
@@ -257,26 +273,45 @@ class EventLoop:
             val["error_dlq"] = str(e)
             val["error_dlq_trace"] = traceback.format_exc()
             self._send_to_dlq_and_commit(msg, new_value=json.dumps(val).encode("utf-8"))
+            self._update_cts_meta(job_id, _CTS_META_KEY_ERROR)
             return
         self._log.info(f"Importer for CTS job {job_id} complete")
         self._commit(msg)
+        self._update_cts_meta(job_id, _CTS_META_KEY_COMPLETE)
 
     _EXP_BACKOFF = [1, 2, 5, 10, 30, 60, 120, 300, 600, -1]
 
     def _get_job_info(self, job_id: str):
+        return self._wrap_request(self._request_job, job_id)
+    
+    def _iso8601_timestamp(self):
+        return datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    def _update_cts_meta(self, job_id: str, state_key: str):
+        update = {"set_fields": {state_key: self._iso8601_timestamp()}}
+        if state_key == _CTS_META_KEY_START:
+            update["unset_keys"] = [_CTS_META_KEY_COMPLETE, _CTS_META_KEY_ERROR]
+        self._wrap_request(
+            self._cts_request,
+            f"admin/jobs/{job_id}/meta",
+            body=update,
+            no_response_body=True
+        )
+
+    def _wrap_request(self, request_func, *args, **kwargs):
         # If the CTS is unreachable, we don't want to keep sticking messages on the DLQ over and
-        # over. As such, we try for several minutes to get the job info and then throw an
+        # over. As such, we try for several minutes to finish the request and then throw an
         # exception and bail out, stopping the event loop.
         for slp in self._EXP_BACKOFF:
             try:
-                return self._request_job(job_id)
+                return request_func(*args, **kwargs)
             except _NoJobError:
                 raise
             except _FatalError:
                 raise
             except Exception:
                 if slp > 0:
-                    self._log.info(f"Error contacting the CTS server, retrying in {slp}s")
+                    self._log.exception(f"Error contacting the CTS server, retrying in {slp}s")
                     time.sleep(slp)
         raise _FatalError(
             f"Failed to connect to the CTS server after {len(self._EXP_BACKOFF) - 1} "
