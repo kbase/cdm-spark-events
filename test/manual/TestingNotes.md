@@ -2,13 +2,57 @@ Testing this is a pain, need to either figure out better tools or add an automat
 
 Assumes docker compose is running.
 
-# Load test files to minio
+# Run a startup test
+
+To run the built in startup test, set the `CSEP_STARTUP_DELTALAKE_SELF_TEST` environment
+variable to 'true` in the docker compose file and restart the compose.
+
+The startup test writes and reads data to Deltalake tables and thus tests that minio, the spark
+master and worker(s), and the event processor can communicate with each other.
+
+# Run an integration test
+
+The integration test tests the flow through the event processor from a kafka message to data
+being written in Minio. It uses a built in importer that creates a trivial employee table.
+To run the test, send a message to Kafka while the docker compose is up:
+
+```
+docker compose exec cdm-events python test/manual/send_kafka_message.py -t '<payload>'
+```
+
+`<payload>` is a JSON string. The example below has line breaks for clarity but
+whitespace should be removed in general.
+
+```
+{
+  "special_event_type": "integration_test",
+  "input_data": <input data, see below>,
+  "app_name_prefix": <the spark app name, optional>,
+  "mode": <"update" or anything else, see below>,
+}
+```
+
+`"input_data"` contains input data to add to the integration test table. It's a list of lists,
+where each entry in the outer list is DB row. Each row consists of, in order, an integer
+employee ID and string employee name.
+
+If `"mode"` is not provided or `"update"` then matching rows in data based on the
+employee ID will be overwritten; otherwise they're ignored. 
+
+After sending the Kafka message, watch the event processor logs to see the results of the test.
+
+Note that the integration test does not access the CTS, nor does it update the Dead Letter Queue
+if an error occurs.
+
+# Run a checkm2 test
+
+## Load test files to minio
 
 ```
 mc cp --recursive --checksum crc64nvme test/manual/data/* local9000/test-events/testfiles/
 ```
 
-# Add a job to the CTS
+## Add a job to the CTS
 
 Image name comes from the checkm2 importer yaml
 
@@ -19,7 +63,11 @@ $ docker compose exec cdm-task-service python /cts_helpers/add_cts_job_to_mongo.
     test-events/testfiles/run2/quality_report.tsv crc2aaaaaaaa
 ```
 
-# Create target table in spark
+## Create target table in spark (optionally)
+
+If the table doesn't exist, the importer will create it. However, to test proper merging
+the table can be created ahead of time. In any case, the spark session will be necessary to
+read the results.
 
 ```
 $ docker compose exec -it --user root cdm-events bash
@@ -33,14 +81,14 @@ In [2]: cfg = Config()
 
 In [3]: from cdmsparkevents.spark import spark_session
 
-In [4]: spark = spark_session(cfg, "myapp")
+In [4]: spark = spark_session(cfg, "some_user", "myapp")
 25/05/27 23:33:42 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
 Setting default log level to "WARN".
 To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
 25/05/27 23:33:44 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
 
 # from the checkm2 importer yaml. May want to make this easier to override
-In [5]: table = "berdl_cdm.checkm2"
+In [5]: table = "u_some_user__autoimport.checkm2"
 
 In [6]: db = table.split(".")[0]
 
@@ -91,17 +139,17 @@ In [24]: spark.stop()
 Stopping the spark session is important as otherwise the importer will hang forever waiting
 for cores on the spark workers. Adding cores in the docker compose file is another option.
  
-# Add an event to kafka
+## Add an event to kafka
 
 ```
 docker compose exec cdm-events python test/manual/send_kafka_message.py -t '{"job_id":"my_job_id","state":"complete"}'
 ```
 
-# Check the results
+## Check the results
 
 Watch the cdm-events logs until the import completes or errors out. Then do one of the below.
 
-## Check the table contents
+### Check the table contents
 
 Start a spark session as shown above and check the contents of the table include the information
 from the new job:
@@ -121,7 +169,7 @@ In [8]: df.show()
 
 ```
 
-## Check the DLQ on error
+### Check the DLQ on error
 
 An error can be forced by adding an extra, non-existant file when creating CTS job earlier.
 

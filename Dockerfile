@@ -1,9 +1,8 @@
 FROM ubuntu:24.04 AS build
 
-ENV IMPORTER_COMMIT=ccf404822cf45efef3def523342389de712548fc
-
 RUN apt update && apt install -y git
 
+ENV IMPORTER_COMMIT=dd4cac4d89b6025ec5589554f4cef7fab464ccb7
 RUN cd /opt && \
     git clone https://github.com/kbase/cdm-spark-events-importers.git && \
     cd cdm-spark-events-importers && \

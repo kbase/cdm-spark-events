@@ -26,6 +26,7 @@ INTEGRATION_TEST_MODULE_NAME = "*** run integration test please """
 _CTS_META_KEY_BASE = "cse_event_processing_"
 _CTS_META_KEY_START = _CTS_META_KEY_BASE + "start"
 _CTS_META_KEY_COMPLETE = _CTS_META_KEY_BASE + "complete"
+_CTS_META_KEY_NO_ACTION = _CTS_META_KEY_BASE + "no_operation"
 _CTS_META_KEY_ERROR = _CTS_META_KEY_BASE + "error"
 
 
@@ -250,6 +251,7 @@ class EventLoop:
         imp_job_info = {
             "id": job_id,
             "outputs": job_info["outputs"],
+            "namespace_prefix": f"u_{job_info['user']}__",
             "image": image,
             "image_digest": job_info["image"]["digest"],
             "input_file_count": job_info["input_file_count"],
@@ -261,8 +263,10 @@ class EventLoop:
             extra={"inf": {k: v for k, v in imp_job_info.items() if k != "outputs"}}
         )
         self._update_cts_meta(job_id, _CTS_META_KEY_START)
-        try:  # TODO Testing this stucks, write automated tests 
-            self._run_importer(image, f"job_id_{job_id}", job_id, imp_job_info)
+        try:  # TODO Testing this sucks, write automated tests 
+            importer_exists = self._run_importer(
+                image, f"job_id_{job_id}", job_info["user"], imp_job_info
+            )
         except Exception as e:
             # TODO RETRIES what it says <-
             # TODO RELIABILITY if we see multiple errors in a row or a specific importer
@@ -275,9 +279,14 @@ class EventLoop:
             self._send_to_dlq_and_commit(msg, new_value=json.dumps(val).encode("utf-8"))
             self._update_cts_meta(job_id, _CTS_META_KEY_ERROR)
             return
-        self._log.info(f"Importer for CTS job {job_id} complete")
+        self._log.info(
+            f"Importer for CTS job {job_id} complete"
+            if importer_exists else f"No importer for image {image} for CTS job {job_id}"
+        )
         self._commit(msg)
-        self._update_cts_meta(job_id, _CTS_META_KEY_COMPLETE)
+        self._update_cts_meta(
+            job_id, _CTS_META_KEY_COMPLETE if importer_exists else _CTS_META_KEY_NO_ACTION
+        )
 
     _EXP_BACKOFF = [1, 2, 5, 10, 30, 60, 120, 300, 600, -1]
 
@@ -323,7 +332,9 @@ class EventLoop:
         app_name = f"{app_prefix}_{uuid.uuid4()}"
         self._log.info(f"Running integration test with app {app_name}")
         try:
-            self._run_importer(INTEGRATION_TEST_MODULE_NAME, app_name, None, val)
+            self._run_importer(
+                INTEGRATION_TEST_MODULE_NAME, app_name, "event_processcor_integration_test", val
+            )
         except Exception as e:
             self._log.exception(
                 f"Integration test failed for {app_name}: {e}",
@@ -334,19 +345,20 @@ class EventLoop:
         self,
         image: str,
         app_name: str,
-        job_id: str,
+        user: str,
         job_info: dict[str, Any],
     ):
         mod = self._immap.get(image)
         if not mod:
-            self._log.info(f"No importer mapped to image {image}, skipping job {job_id}")
+            return False
         sparkcapture = []
         def get_spark(*, executor_cores: int = 1) -> SparkSession:
-            spark = spark_session(self._cfg, app_name, executor_cores=executor_cores)
+            spark = spark_session(self._cfg, user, app_name, executor_cores=executor_cores)
             sparkcapture.append(spark)
             return spark
         try:
             mod[0].run_import(get_spark, job_info, mod[1])
+            return True
         finally:
             if sparkcapture:
                 sparkcapture[0].stop()

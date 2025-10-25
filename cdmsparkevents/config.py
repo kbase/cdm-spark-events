@@ -11,7 +11,7 @@ class Config(BaseSettings):
     """
     The configuration for the CDM events processor.
     """
-    model_config = SettingsConfigDict(case_sensitive=True, str_strip_whitespace=True)
+    model_config = SettingsConfigDict(case_sensitive=True, str_strip_whitespace=True, frozen=True)
     
     kafka_bootstrap_servers: Annotated[str, Field(
         validation_alias="CSEP_KAFKA_BOOTSTRAP_SERVERS",
@@ -112,6 +112,13 @@ class Config(BaseSettings):
             + "running.",
         min_length=1,
     )]
+    spark_sql_user_warehouse_prefix: Annotated[str, Field(
+        validation_alias="CSEP_SPARK_SQL_USER_WAREHOUSE_PREFIX",
+        examples=["s3a://cdm-lake/users-sql-warehouse"],
+        description="The path to the Spark SQL user warehouse, starting with s3a://. "
+            + "Must be readable and writeable by the event processor.",
+        min_length=1,
+    )]
 
     _SAFE_FIELDS = {
         "kafka_bootstrap_servers", 
@@ -127,6 +134,7 @@ class Config(BaseSettings):
         "spark_master_url",
         "spark_driver_host",
         "spark_jars_dir",
+        "spark_sql_user_warehouse_prefix",
     }
     
     def safe_dump(self) -> dict[str, Any]:

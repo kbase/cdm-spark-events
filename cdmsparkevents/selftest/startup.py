@@ -35,7 +35,7 @@ def run_deltalake_startup_test(cfg: Config):
         Row(employee_id=1, employee_name="Alice"),
         Row(employee_id=2, employee_name="Bob")
     ]
-    spark = spark_session(cfg, name)
+    spark = spark_session(cfg, "event_processcor_startup_test", name)
     try:
         df = spark.createDataFrame(data, schema=schema)
         logr.info(f"Creating self test database {name}")

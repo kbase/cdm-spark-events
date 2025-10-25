@@ -2,18 +2,20 @@
 Set up a spark session for use by importers.
 """
 
+from functools import lru_cache
 import logging
 from pathlib import Path
+from pyspark.conf import SparkConf
+from pyspark.sql import SparkSession
 
 from cdmsparkevents.arg_checkers import check_num as _check_num, require_string as _require_string
 from cdmsparkevents.config import Config
-from pyspark.conf import SparkConf
-from pyspark.sql import SparkSession
 
 
 _REQUIRED_JAR_PREFIXES = ["delta-spark_", "hadoop-aws-"]
 
 
+@lru_cache
 def _find_jars(cfg: Config):
     logr = logging.getLogger(__name__)
     directory = Path(cfg.spark_jars_dir).resolve()
@@ -37,6 +39,7 @@ def _find_jars(cfg: Config):
 
 def spark_session(
         cfg: Config,
+        user: str,
         app_name: str,
         executor_cores: int = 1,
     ) -> SparkSession:
@@ -44,11 +47,14 @@ def spark_session(
     Generate a spark session for an importer.
     
     cfg - The event processor configuration.
+    user - the username of the KBase user. Used to determine the SQL warehouse where the data
+        will be written.
     app_name - The name for the spark application. This should be unique among applications.
     executor_cores - the number of cores to use per executor.
     """
     # Sourced from https://github.com/kbase/cdm-jupyterhub/blob/main/src/spark/utils.py
     # with fairly massive changes
+    _require_string(user, "user")
     config = {
         # Basic config
         "spark.app.name": _require_string(app_name, "app_name"),
@@ -72,8 +78,9 @@ def spark_session(
         "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         "spark.databricks.delta.retentionDurationCheck.enabled": "false",
         "spark.sql.catalogImplementation": "hive",
+        "spark.sql.warehouse.dir": f"{cfg.spark_sql_user_warehouse_prefix.rstrip('/')}/{user}/",
         
-        # Hive & S3 warehouse dir config is set up in the base image
+        # Hive config is set up in the base image
     }
     
     spark_conf = SparkConf().setAll(list(config.items()))
