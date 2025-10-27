@@ -263,6 +263,7 @@ services:
       CSEP_STARTUP_DELTALAKE_SELF_TEST: false
       CSEP_SPARK_MASTER_URL: spark://spark-master:7077
       CSEP_SPARK_DRIVER_HOST: cdm-events
+      CSEP_SPARK_SQL_USER_WAREHOUSE_PREFIX: s3a://test-events/users-sql-warehouse
 
       # The following are configuration parameters recognized by the spark base image rather
       # than the CSEP itself
@@ -272,8 +273,7 @@ services:
       POSTGRES_PASSWORD: hivepassword
       POSTGRES_DB: hive
       POSTGRES_URL: postgres:5432
-      DELTALAKE_WAREHOUSE_DIR: s3a://test-events/deltalake_dbs
-      # set to false for production use
+      # Importers should not implicitly create tables, but hive won't start without this
       DATANUCLEUS_AUTO_CREATE_TABLES: true
     volumes:
       - shared-token:/shared
