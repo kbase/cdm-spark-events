@@ -9,6 +9,10 @@ RUN cd /opt && \
     git checkout $IMPORTER_COMMIT && \
     echo $IMPORTER_COMMIT > ./git_commit
 
+WORKDIR /git
+COPY .git /git
+RUN git rev-parse HEAD > /git/git_commit
+
 FROM ghcr.io/kbase/cdm-spark-standalone:pr-36
 
 USER root
@@ -28,6 +32,7 @@ WORKDIR /csep
 
 COPY entrypoint.sh /csep/
 COPY cdmsparkevents /csep/cdmsparkevents
+COPY --from=build /git/git_commit /csep/git_commit
 COPY --from=build /opt/cdm-spark-events-importers/cdmeventimporters /importers/cdmeventimporters
 COPY --from=build /opt/cdm-spark-events-importers/git_commit /importers/git_commit
 
