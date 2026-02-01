@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo -n "Event processor git commit: " && cat /csep/git_commit
+echo -n "Importer repo  git commit : " && cat /importers/git_commit
+
 # Function to trim whitespace
 trim() {
   echo "$1" | awk '{$1=$1;print}'
