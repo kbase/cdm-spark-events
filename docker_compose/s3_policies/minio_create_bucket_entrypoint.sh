@@ -18,6 +18,10 @@ else
   echo "bucket $MINIO_EVENTS_BUCKET already exists"
 fi
 
+# required for hive metastore to start, since it stats the warehouse path
+# seems to work even though there's no real file at the warehouse path
+echo -n "" | mc pipe minio/$MINIO_EVENTS_BUCKET/$MINIO_SQL_WAREHOUSE_PATH/.keep
+
 # create policies
 mc admin policy create minio cdm-task-service-read-write-policy /s3_policies/cdm-task-service-read-write-policy.json
 mc admin policy create minio test-events-read-write-policy /s3_policies/test-events-read-write-policy.json

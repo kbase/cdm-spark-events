@@ -119,6 +119,12 @@ class Config(BaseSettings):
             + "Must be readable and writeable by the event processor.",
         min_length=1,
     )]
+    hive_metastore_url: Annotated[str, Field(
+        validation_alias="CSEP_HIVE_METASTORE_URI",
+        examples=["thrift://hive-metastore:9083"],
+        description="The URL for the hive metastore.",
+        min_length=1,
+    )]
 
     _SAFE_FIELDS = {
         "kafka_bootstrap_servers", 
@@ -135,6 +141,7 @@ class Config(BaseSettings):
         "spark_driver_host",
         "spark_jars_dir",
         "spark_sql_user_warehouse_prefix",
+        "hive_metastore_url"
     }
     
     def safe_dump(self) -> dict[str, Any]:
