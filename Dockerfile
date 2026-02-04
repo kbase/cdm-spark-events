@@ -13,7 +13,7 @@ WORKDIR /git
 COPY .git /git
 RUN git rev-parse HEAD > /git/git_commit
 
-FROM ghcr.io/kbase/cdm-spark-standalone:pr-36
+FROM ghcr.io/berdatalakehouse/kube_spark_manager_image:pr-7
 
 USER root
 
@@ -23,7 +23,7 @@ WORKDIR /uvinstall
 
 COPY pyproject.toml uv.lock .python-version .
 
-ENV UV_PROJECT_ENVIRONMENT=/opt/bitnami/python
+ENV UV_PROJECT_ENVIRONMENT=/opt/conda
 RUN uv sync --locked --inexact --no-dev
 
 RUN mkdir /csep && mkdir /importers
@@ -42,8 +42,8 @@ RUN python /csep/cdmsparkevents/generate_importer_mappings.py \
     /importers \
     /csep/importer_mappings.json
 
-USER spark_user
+#USER spark_user # no such user in new image
 
-ENV CSEP_SPARK_JARS_DIR=/opt/bitnami/spark/jars
+ENV CSEP_SPARK_JARS_DIR=/usr/local/spark/jars
 
 ENTRYPOINT ["tini", "--", "/csep/entrypoint.sh", "/csep/importer_mappings.json"]

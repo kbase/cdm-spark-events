@@ -35,7 +35,4 @@ else
   echo "Loaded token from $CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN_FILE into environment."
 fi
 
-# Set up the spark environment
-. /opt/scripts/setup.sh
-
 python /csep/cdmsparkevents/main.py "$@"

@@ -20,8 +20,7 @@ To run the test, send a message to Kafka while the docker compose is up:
 docker compose exec cdm-events python test/manual/send_kafka_message.py -t '<payload>'
 ```
 
-`<payload>` is a JSON string. The example below has line breaks for clarity but
-whitespace should be removed in general.
+`<payload>` is a JSON string:
 
 ```
 {

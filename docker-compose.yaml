@@ -63,6 +63,7 @@ services:
       MINIO_CTS_USER: cts
       MINIO_CTS_PWD: ctspassword
       MINIO_EVENTS_BUCKET: test-events
+      MINIO_SQL_WAREHOUSE_PATH: users-sql-warehouse
       MINIO_EVENTS_USER: events
       MINIO_EVENTS_PWD: eventspassword
     entrypoint: /s3_policies/minio_create_bucket_entrypoint.sh
@@ -115,26 +116,48 @@ services:
     volumes:
       - shared-token:/shared
 
+  hive-metastore:
+    image: ghcr.io/berdatalakehouse/hive_metastore:0.0.1
+    platform: linux/amd64
+    ports:
+      - "9083:9083"
+    environment:
+      POSTGRES_DB: hive
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hivepassword
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: miniouser
+      S3_SECRET_KEY: miniopassword
+      DELTALAKE_WAREHOUSE_DIR: s3a://test-events/users-sql-warehouse
+    depends_on:
+      postgres:
+        condition: service_started
+      minio-create-bucket:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9083"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   spark-master:
-    image: ghcr.io/kbase/cdm-spark-standalone:pr-36
+    image: ghcr.io/berdatalakehouse/kube_spark_manager_image:pr-7
     platform: linux/amd64
     ports:
       - 8090:8090
     environment:
       SPARK_MODE: master
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: 7077
       SPARK_MASTER_WEBUI_PORT: 8090
       MAX_EXECUTORS: 4
       EXECUTOR_CORES: 2
       MAX_CORES_PER_APPLICATION: 10
-      POSTGRES_USER: hive
-      POSTGRES_PASSWORD: hivepassword
-      POSTGRES_DB: hive
-      POSTGRES_URL: postgres:5432
-      DATANUCLEUS_AUTO_CREATE_TABLES: true
-      DELTALAKE_WAREHOUSE_DIR: s3a://test-events/deltalake_dbs
 
   spark-worker-1:
-    image: ghcr.io/kbase/cdm-spark-standalone:pr-36
+    image: ghcr.io/berdatalakehouse/kube_spark_manager_image:pr-7
     platform: linux/amd64
     depends_on:
       - spark-master
@@ -145,16 +168,16 @@ services:
       SPARK_MASTER_URL: spark://spark-master:7077
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 1G
+      SPARK_WORKER_PORT: 8083
       SPARK_WORKER_WEBUI_PORT: 8081
-      POSTGRES_USER: hive
-      POSTGRES_PASSWORD: hivepassword
-      POSTGRES_DB: hive
-      POSTGRES_URL: postgres:5432
-      DATANUCLEUS_AUTO_CREATE_TABLES: true
-      DELTALAKE_WAREHOUSE_DIR: s3a://test-events/deltalake_dbs
+      # these don't seem to be used
+      BERDL_REDIS_HOST: "fake"
+      BERDL_REDIS_PORT: 10000
+      BERDL_HIVE_METASTORE_URI: fake
+      BERDL_DELTALAKE_WAREHOUSE_DIRECTORY_PATH: fake
 
   spark-worker-2:
-    image: ghcr.io/kbase/cdm-spark-standalone:pr-36
+    image: ghcr.io/berdatalakehouse/kube_spark_manager_image:pr-7
     platform: linux/amd64
     depends_on:
       - spark-master
@@ -165,13 +188,13 @@ services:
       SPARK_MASTER_URL: spark://spark-master:7077
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 1G
+      SPARK_WORKER_PORT: 8084
       SPARK_WORKER_WEBUI_PORT: 8082
-      POSTGRES_USER: hive
-      POSTGRES_PASSWORD: hivepassword
-      POSTGRES_DB: hive
-      POSTGRES_URL: postgres:5432
-      DATANUCLEUS_AUTO_CREATE_TABLES: true
-      DELTALAKE_WAREHOUSE_DIR: s3a://test-events/deltalake_dbs
+      # these don't seem to be used
+      BERDL_REDIS_HOST: "fake"
+      BERDL_REDIS_PORT: 10000
+      BERDL_HIVE_METASTORE_URI: fake
+      BERDL_DELTALAKE_WAREHOUSE_DIRECTORY_PATH: fake
 
   cdm-task-service:
     image: ghcr.io/kbase/cdm-task-service:pr-351
@@ -264,17 +287,7 @@ services:
       CSEP_SPARK_MASTER_URL: spark://spark-master:7077
       CSEP_SPARK_DRIVER_HOST: cdm-events
       CSEP_SPARK_SQL_USER_WAREHOUSE_PREFIX: s3a://test-events/users-sql-warehouse
-
-      # The following are configuration parameters recognized by the spark base image rather
-      # than the CSEP itself
-      # See https://github.com/kbase/cdm-spark-standalone/blob/main/scripts/setup.sh
-      # for other optional variables
-      POSTGRES_USER: hive
-      POSTGRES_PASSWORD: hivepassword
-      POSTGRES_DB: hive
-      POSTGRES_URL: postgres:5432
-      # Importers should not implicitly create tables, but hive won't start without this
-      DATANUCLEUS_AUTO_CREATE_TABLES: true
+      CSEP_HIVE_METASTORE_URI: thrift://hive-metastore:9083
     volumes:
       - shared-token:/shared
       - ./test/manual:/csep/test/manual
