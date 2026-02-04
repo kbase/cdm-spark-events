@@ -71,7 +71,7 @@ def spark_session(
         #"spark.executor.memory": # default
         "spark.executor.cores": f"{_check_num(executor_cores, 'executor_cores')}",
         "spark.dynamicAllocation.enabled": "true",
-        "spark.dynamicAllocation.maxExecutors": 5, # default from old cdm-spark-standalone
+        "spark.dynamicAllocation.maxExecutors": "5", # default from old cdm-spark-standalone
         # shuffle tracking shouldn't be used with decommissioning (below)
         "spark.dynamicAllocation.shuffleTracking.enabled": "false",
         # Backlog timeouts for scaling up
