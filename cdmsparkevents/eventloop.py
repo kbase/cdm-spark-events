@@ -8,6 +8,7 @@ import json
 from kafka import KafkaConsumer, KafkaProducer, TopicPartition, OffsetAndMetadata
 from kafka.consumer.fetcher import ConsumerRecord
 import logging
+import os
 from pyspark.sql import SparkSession
 import requests
 import time
@@ -242,6 +243,8 @@ class EventLoop:
         self._log.info(f"Fetching completed CTS job {job_id}")
         try:
             job_info = self._get_job_info(job_id)
+            if os.environ.get("CSEP_LOG_JOBS"):  # Testing only, not documented for now
+                self._log.info(f"Job {job_id}", extra={"job_details": job_info})
         except _NoJobError:
             self._log.error(f"No such job: {job_id}")
             val["error_dlq"] = "No such job"
