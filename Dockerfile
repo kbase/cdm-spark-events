@@ -13,7 +13,7 @@ WORKDIR /git
 COPY .git /git
 RUN git rev-parse HEAD > /git/git_commit
 
-FROM ghcr.io/berdatalakehouse/kube_spark_manager_image:pr-7
+FROM ghcr.io/berdatalakehouse/kube_spark_manager_image:pr-9
 
 USER root
 
