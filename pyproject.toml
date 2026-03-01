@@ -8,7 +8,7 @@ dependencies = [
     "delta-spark==4.0.1",
     "kafka-python==2.2.11",
     "pandas==2.3.0",
-    "pydantic-settings==2.9.1",
+    "pydantic-settings==2.13.1",
     "pyspark==4.1.1",
     "python-json-logger==3.3.0",
     "pyyaml==6.0.2",
