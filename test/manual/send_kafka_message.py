@@ -7,13 +7,19 @@ docker compose exec cdm-events python test/manual/send_kafka_message.py -t <mess
 """
 
 # TODO CTS send a message in CTS format - eh, this is actually really easy as is. Probably YAGNI
-
-
-from kafka import KafkaProducer
 import os
 import sys
 
+from kafka import KafkaProducer
+
 from cdmsparkevents.config import Config
+
+
+def _load_secret_from_file(env_var: str, file_env_var: str):
+    if os.environ.get(env_var) or not os.environ.get(file_env_var):
+        return
+    with open(os.environ[file_env_var], encoding="utf-8") as handle:
+        os.environ[env_var] = handle.read().strip()
 
 
 def main():
@@ -21,12 +27,13 @@ def main():
     if sys.argv[1] != "-t":
         raise ValueError(f"Unknown option: {sys.argv[1]}")
     # prevent config errors if the token is passed via a file vs. env var
-    os.environ["CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN"] = "foo"
+    os.environ.setdefault("CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN", "foo")
+    _load_secret_from_file("CSEP_POLARIS_CREDENTIAL", "CSEP_POLARIS_CREDENTIAL_FILE")
     cfg = Config()
     prod = KafkaProducer(
         bootstrap_servers=cfg.kafka_bootstrap_servers.split(","),
         enable_idempotence=True,
-        acks='all',
+        acks="all",
     )
     try:
         fut = prod.send(cfg.kafka_topic_jobs, sys.argv[2].encode("utf-8"))

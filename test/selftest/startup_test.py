@@ -1,4 +1,4 @@
-from cdmsparkevents.selftest import startup  # @UnusedImport
+from cdmsparkevents.selftest import startup
 
 def test_noop():
-    pass
+    assert startup.run_iceberg_startup_test

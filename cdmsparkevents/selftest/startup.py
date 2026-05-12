@@ -3,64 +3,61 @@ Run a basic self test on startup of the event loop. This can take seconds to min
 """
 
 import logging
-from pyspark.sql.types import StructType, IntegerType, StructField, StringType, Row
 import uuid
+
+from pyspark.sql.types import IntegerType, Row, StringType, StructField, StructType
 
 from cdmsparkevents.config import Config
 from cdmsparkevents.spark import spark_session
 
 
-def run_deltalake_startup_test(cfg: Config):
+def run_iceberg_startup_test(cfg: Config):
     """
-    Runs a simple check that the service can write to and read from deltalake tables:
-    
-    * Creates a DB with a unique name
+    Runs a simple check that the service can write to and read from Iceberg tables:
+
+    * Creates a namespace with a unique name
     * Writes a very small amount of data to an employees table
     * Queries the table
-    * Drops the DB
-    
+    * Drops the namespace
+
     cfg - The event processor configuration.
     """
     logr = logging.getLogger(__name__)
     name = "cdm_events_startup_test_" + str(uuid.uuid4()).replace("-", "_")
-    schema = StructType([
-       StructField("employee_id", IntegerType(), nullable=False),
-       StructField("employee_name", StringType(), nullable=False)
-    ])
-    data = [
-        (1, "Alice"),
-        (2, "Bob")
-    ]
+    schema = StructType(
+        [
+            StructField("employee_id", IntegerType(), nullable=False),
+            StructField("employee_name", StringType(), nullable=False),
+        ]
+    )
+    data = [(1, "Alice"), (2, "Bob")]
     expected_data = [
         Row(employee_id=1, employee_name="Alice"),
-        Row(employee_id=2, employee_name="Bob")
+        Row(employee_id=2, employee_name="Bob"),
     ]
-    spark = spark_session(cfg, "event_processcor_startup_test", name)
+    table_name = f"{name}.employees"
+    spark = spark_session(cfg, "event_processor_startup_test", name)
     try:
         df = spark.createDataFrame(data, schema=schema)
-        logr.info(f"Creating self test database {name}")
-        spark.sql(f"CREATE DATABASE {name}")
+        logr.info(f"Creating self test namespace {name}")
+        spark.sql(f"CREATE NAMESPACE {name}")
         try:
-            logr.info("Writing to self test database")
-            df.write.mode(
-                "overwrite"
-                ).option("compression", "snappy"
-                ).format("delta"
-                ).saveAsTable(f"{name}.employees"
-            )
-            logr.info("Querying self test database")
-            newdf = spark.sql(f"SELECT * FROM {name}.employees")
+            logr.info("Writing to self test namespace")
+            df.writeTo(table_name).using("iceberg").create()
+            logr.info("Querying self test namespace")
+            newdf = spark.sql(f"SELECT * FROM {table_name}")
             actual_data = newdf.orderBy("employee_id").collect()
             if expected_data != actual_data:
                 raise ValueError(f"""The startup self test failed. Expected data:
                     {expected_data}
                     Actual data:
                     {actual_data}
-                    """
-                )
+                    """)
         finally:
-            logr.info(f"Dropping self test database {name}")
-            spark.sql(f"DROP DATABASE {name} CASCADE")
+            logr.info(f"Dropping self test table {table_name}")
+            spark.sql(f"DROP TABLE IF EXISTS {table_name}")
+            logr.info(f"Dropping self test namespace {name}")
+            spark.sql(f"DROP NAMESPACE IF EXISTS {name}")
     finally:
         spark.stop()
-    logr.info("Deltalake connectivity startup self test passed")
+    logr.info("Iceberg connectivity startup self test passed")

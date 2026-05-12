@@ -254,7 +254,11 @@ class EventLoop:
         imp_job_info = {
             "id": job_id,
             "outputs": job_info["outputs"],
-            "namespace_prefix": f"u_{job_info['user']}__",
+            # Back-compat for Hive-era importers that prepend a per-user prefix to
+            # database names. With Polaris/Iceberg the per-user catalog provides
+            # isolation, so no prefix is needed; importers should address tables via
+            # the default `my` catalog (e.g. `namespace.table` or `my.namespace.table`).
+            "namespace_prefix": "",
             "image": image,
             "image_digest": job_info["image"]["digest"],
             "input_file_count": job_info["input_file_count"],
@@ -336,7 +340,7 @@ class EventLoop:
         self._log.info(f"Running integration test with app {app_name}")
         try:
             self._run_importer(
-                INTEGRATION_TEST_MODULE_NAME, app_name, "event_processcor_integration_test", val
+                INTEGRATION_TEST_MODULE_NAME, app_name, "event_processor_integration_test", val
             )
         except Exception as e:
             self._log.exception(

@@ -1,4 +1,4 @@
-from cdmsparkevents.selftest import integration  # @UnusedImport
+from cdmsparkevents.selftest import integration
 
 def test_noop():
-    pass
+    assert integration.run_import

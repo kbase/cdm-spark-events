@@ -15,7 +15,7 @@ from typing import Any
 
 from cdmsparkevents.config import Config
 from cdmsparkevents.eventloop import EventLoop
-from cdmsparkevents.selftest.startup import run_deltalake_startup_test
+from cdmsparkevents.selftest.startup import run_iceberg_startup_test
 
 
 # Spark logs are still not going through the JSON logger, don't worry about it for now
@@ -69,7 +69,7 @@ def _load_mappings(logr: Logger) -> dict[str, tuple[ModuleType, dict[str, Any]]]
             mod = importlib.import_module(modstr)
         except:
             raise ValueError(f"Could not import module {mod} from yaml file {info['file']}")
-        # TODO IMPORTER_META may want to have some defined fields here, e.g. deltatable
+        # TODO IMPORTER_META may want to have some defined fields here, e.g. target table
         ret[image] = (mod, meta)
         image2mod.append({"image": image, "mod": modstr, "meta": meta})
     logr.info("Loaded importer modules", extra={"modules": image2mod})
@@ -83,8 +83,8 @@ def main():
     logr = logging.getLogger("cdmsparkevents.main")
     logr.info("Service configuration", extra=cfg.safe_dump())
     importer_mappings = _load_mappings(logr)
-    if cfg.startup_deltalake_self_test:
-        run_deltalake_startup_test(cfg)
+    if cfg.startup_iceberg_self_test:
+        run_iceberg_startup_test(cfg)
     evl = EventLoop(cfg, importer_mappings)
     try:
         evl.start_event_loop()
