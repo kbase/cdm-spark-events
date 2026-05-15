@@ -31,7 +31,9 @@ def test_generate_spark_conf_uses_iceberg_polaris_catalog(monkeypatch, tmp_path)
     _write_required_jars(tmp_path)
     _set_required_env(monkeypatch, tmp_path)
 
-    conf = generate_spark_conf(Config(), "Alice-Lake", "import_app", executor_cores=2)
+    # KBase usernames are restricted to ^[a-z][a-z0-9_]*$ (see UserName.java
+    # in kbase/auth2), so the portable alias is the username verbatim.
+    conf = generate_spark_conf(Config(), "alice_lake", "import_app", executor_cores=2)
 
     assert conf["spark.sql.extensions"] == (
         "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
@@ -40,8 +42,8 @@ def test_generate_spark_conf_uses_iceberg_polaris_catalog(monkeypatch, tmp_path)
     assert conf["spark.sql.catalog.my"] == "org.apache.iceberg.spark.SparkCatalog"
     assert conf["spark.sql.catalog.my.type"] == "rest"
     assert conf["spark.sql.catalog.my.uri"] == "http://polaris:8181/api/catalog"
-    assert conf["spark.sql.catalog.my.warehouse"] == "user_Alice-Lake"
-    assert conf["spark.sql.catalog.alice_lake.warehouse"] == "user_Alice-Lake"
+    assert conf["spark.sql.catalog.my.warehouse"] == "user_alice_lake"
+    assert conf["spark.sql.catalog.alice_lake.warehouse"] == "user_alice_lake"
     assert conf["spark.sql.catalog.my.s3.endpoint"] == "http://minio:9000"
     assert conf["spark.hadoop.fs.s3a.connection.ssl.enabled"] == "false"
     assert "delta" not in " ".join(conf.values()).lower()

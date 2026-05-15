@@ -5,7 +5,6 @@ Set up a spark session for use by importers.
 from functools import lru_cache
 import logging
 from pathlib import Path
-import re
 
 from pyspark.conf import SparkConf
 from pyspark.sql import SparkSession
@@ -43,10 +42,6 @@ def _find_jars(cfg: Config):
     return ", ".join(results)
 
 
-def _sanitize_catalog_alias(value: str) -> str:
-    return re.sub(r"[^a-z0-9_]", "_", value.lower()).strip("_")
-
-
 def _personal_catalog_name(cfg: Config, user: str) -> str:
     try:
         catalog_name = cfg.polaris_personal_catalog_template.format(user=user)
@@ -60,11 +55,23 @@ def _personal_catalog_name(cfg: Config, user: str) -> str:
 
 
 def _get_personal_catalog_aliases(personal_catalog: str) -> list[str]:
+    """Spark client aliases for the per-user Polaris catalog.
+
+    Always includes the default `my` alias plus a portable `<username>` alias
+    derived by stripping the `user_` prefix from the configured catalog name.
+    Both aliases point at the same Polaris warehouse — the duplicate just gives
+    importers the option of writing `my.namespace.table` or
+    `<username>.namespace.table`.
+
+    Assumes `personal_catalog` is already a valid Spark catalog identifier
+    (lowercase letters, digits, underscores). With the default
+    `polaris_personal_catalog_template = "user_{user}"` and KBase's username
+    regex (`^[a-z][a-z0-9_]*$`), this is guaranteed.
+    """
     aliases = [_ICEBERG_CATALOG_ALIAS]
     portable_alias = personal_catalog.strip()
     if portable_alias.startswith("user_"):
-        portable_alias = portable_alias[len("user_") :]
-    portable_alias = _sanitize_catalog_alias(portable_alias)
+        portable_alias = portable_alias[len("user_"):]
     if portable_alias and portable_alias not in aliases:
         aliases.append(portable_alias)
     return aliases
@@ -126,6 +133,27 @@ def generate_spark_conf(
 ) -> dict[str, str]:
     """
     Generate the Spark configuration used by the event processor.
+
+    Wires the per-user Iceberg catalog (Polaris REST) under the default
+    `my` alias plus a portable `<sanitized-user>` alias, configures S3
+    access for both Spark's Hadoop client and Iceberg's S3FileIO, and
+    sets the dynamic-allocation / shuffle defaults the importer code paths
+    rely on.
+
+    cfg - the event processor configuration. Must have a non-empty Polaris
+        catalog URI, OAuth credential, and S3 endpoint; see
+        :class:`cdmsparkevents.config.Config`.
+    user - the KBase username. Resolved through
+        ``cfg.polaris_personal_catalog_template`` (default ``user_{user}``)
+        to select the per-user Polaris warehouse.
+    app_name - the Spark application name. Should be unique among
+        applications running against the same Spark master.
+    executor_cores - cores per Spark executor. Defaults to 1 since most
+        importer work is IO-bound.
+
+    Returns the Spark config as a flat ``{key: value}`` dict suitable for
+    ``SparkConf().setAll(...)``. Split out from :func:`spark_session` to
+    make the conf assertable in unit tests without spinning up Spark.
     """
     _require_string(user, "user")
     config = {
