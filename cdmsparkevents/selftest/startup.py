@@ -54,8 +54,14 @@ def run_iceberg_startup_test(cfg: Config):
                     {actual_data}
                     """)
         finally:
+            # PURGE removes the table's data + metadata files from S3 as well
+            # as dropping the catalog entry; otherwise repeated selftest runs
+            # would accumulate orphaned files under the warehouse prefix.
+            # `DROP NAMESPACE … CASCADE` isn't supported by Polaris (returns
+            # NamespaceNotEmptyException), so the table is dropped explicitly
+            # first and the namespace second.
             logr.info(f"Dropping self test table {table_name}")
-            spark.sql(f"DROP TABLE IF EXISTS {table_name}")
+            spark.sql(f"DROP TABLE IF EXISTS {table_name} PURGE")
             logr.info(f"Dropping self test namespace {name}")
             spark.sql(f"DROP NAMESPACE IF EXISTS {name}")
     finally:
