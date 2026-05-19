@@ -2,9 +2,10 @@
 Configuration for the event handler.
 """
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Annotated, Any
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Config(BaseSettings):
@@ -12,7 +13,7 @@ class Config(BaseSettings):
     The configuration for the CDM events processor.
     """
     model_config = SettingsConfigDict(case_sensitive=True, str_strip_whitespace=True, frozen=True)
-    
+
     kafka_bootstrap_servers: Annotated[str, Field(
         validation_alias="CSEP_KAFKA_BOOTSTRAP_SERVERS",
         examples=["localhost:9092"],
@@ -87,11 +88,38 @@ class Config(BaseSettings):
         description="The Minio secret key.",
         min_length=1,
     )]
-    startup_deltalake_self_test: Annotated[bool, Field(
-        validation_alias="CSEP_STARTUP_DELTALAKE_SELF_TEST",
-        description="Whether to run a self test on startup that checks deltalake "
+    minio_secure: Annotated[bool, Field(
+        validation_alias="CSEP_MINIO_SECURE",
+        description="Whether MinIO/S3 should be accessed over HTTPS when the endpoint "
+            + "does not already include a scheme.",
+    )] = False
+    startup_iceberg_self_test: Annotated[bool, Field(
+        validation_alias=AliasChoices(
+            "CSEP_STARTUP_ICEBERG_SELF_TEST",
+            "CSEP_STARTUP_DELTALAKE_SELF_TEST",
+        ),
+        description="Whether to run a self test on startup that checks Iceberg "
             + "read / write ability. The test takes seconds to minutes to perform.",
+    )] = False
+    polaris_catalog_uri: Annotated[str, Field(
+        validation_alias=AliasChoices("CSEP_POLARIS_CATALOG_URI", "POLARIS_CATALOG_URI"),
+        examples=["https://polaris.kbase.us/api/catalog"],
+        description="The Apache Polaris REST catalog URI.",
+        min_length=1,
     )]
+    polaris_credential: Annotated[str, Field(
+        validation_alias=AliasChoices("CSEP_POLARIS_CREDENTIAL", "POLARIS_CREDENTIAL"),
+        examples=["client_id:client_secret"],
+        description="The Polaris OAuth client credential to use for Iceberg catalog access.",
+        min_length=1,
+    )]
+    polaris_personal_catalog_template: Annotated[str, Field(
+        validation_alias="CSEP_POLARIS_PERSONAL_CATALOG_TEMPLATE",
+        examples=["user_{user}"],
+        description="Template for deriving a user's personal Polaris catalog name from "
+            + "the CTS job username. The template must contain a {user} placeholder.",
+        min_length=1,
+    )] = "user_{user}"
     spark_master_url: Annotated[str, Field(
         validation_alias="CSEP_SPARK_MASTER_URL",
         examples=["https://spark.kbase.us"],
@@ -112,22 +140,9 @@ class Config(BaseSettings):
             + "running.",
         min_length=1,
     )]
-    spark_sql_user_warehouse_prefix: Annotated[str, Field(
-        validation_alias="CSEP_SPARK_SQL_USER_WAREHOUSE_PREFIX",
-        examples=["s3a://cdm-lake/users-sql-warehouse"],
-        description="The path to the Spark SQL user warehouse, starting with s3a://. "
-            + "Must be readable and writeable by the event processor.",
-        min_length=1,
-    )]
-    hive_metastore_url: Annotated[str, Field(
-        validation_alias="CSEP_HIVE_METASTORE_URI",
-        examples=["thrift://hive-metastore:9083"],
-        description="The URL for the hive metastore.",
-        min_length=1,
-    )]
 
     _SAFE_FIELDS = {
-        "kafka_bootstrap_servers", 
+        "kafka_bootstrap_servers",
         "kafka_topic_jobs",
         "kafka_topic_jobs_dlq",
         "kafka_group_id",
@@ -135,15 +150,15 @@ class Config(BaseSettings):
         "cdm_task_service_url",
         "minio_url",
         "minio_access_key",
-        "deltalake_s3_warehouse_dir",
-        "startup_deltalake_self_test",
+        "minio_secure",
+        "startup_iceberg_self_test",
+        "polaris_catalog_uri",
+        "polaris_personal_catalog_template",
         "spark_master_url",
         "spark_driver_host",
         "spark_jars_dir",
-        "spark_sql_user_warehouse_prefix",
-        "hive_metastore_url"
     }
-    
+
     def safe_dump(self) -> dict[str, Any]:
         """
         Return the settings as a dictionary with any sensitive fields (passwords, etc.) redacted.

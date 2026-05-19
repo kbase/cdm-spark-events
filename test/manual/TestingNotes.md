@@ -4,11 +4,13 @@ Assumes docker compose is running.
 
 # Run a startup test
 
-To run the built in startup test, set the `CSEP_STARTUP_DELTALAKE_SELF_TEST` environment
-variable to 'true` in the docker compose file and restart the compose.
+To run the built in startup test, set the `CSEP_STARTUP_ICEBERG_SELF_TEST` environment
+variable to `true` in the docker compose file and restart the compose. The legacy
+`CSEP_STARTUP_DELTALAKE_SELF_TEST` name is still accepted as an alias.
 
-The startup test writes and reads data to Deltalake tables and thus tests that minio, the spark
-master and worker(s), and the event processor can communicate with each other.
+The startup test writes and reads data to Iceberg tables via the Polaris REST catalog
+and thus tests that minio, Polaris, the spark master and worker(s), and the event
+processor can communicate with each other.
 
 # Run an integration test
 
@@ -72,6 +74,10 @@ read the results.
 $ docker compose exec -it --user root cdm-events bash
 root@3568743395c1:/csep# pip install ipython
 root@3568743395c1:/csep# export CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN=$(cat /shared/token.txt | tr -d '[:space:]')
+# Polaris credential is also required by Config(); the entrypoint exports it for PID 1
+# but `docker compose exec` does not inherit those exports, so load it from the same file
+# the entrypoint reads.
+root@3568743395c1:/csep# export CSEP_POLARIS_CREDENTIAL=$(cat "$CSEP_POLARIS_CREDENTIAL_FILE" | tr -d '[:space:]')
 root@3568743395c1:/csep# ipython
 
 In [1]: from cdmsparkevents.config import Config
@@ -86,12 +92,13 @@ Setting default log level to "WARN".
 To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
 25/05/27 23:33:44 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
 
-# from the checkm2 importer yaml. May want to make this easier to override
-In [5]: table = "u_some_user__autoimport.checkm2"
+# from the checkm2 importer yaml. The Iceberg/Polaris path uses the user's per-user
+# catalog as the default catalog, so no `u_<user>__` prefix is needed.
+In [5]: table = "autoimport.checkm2"
 
 In [6]: db = table.split(".")[0]
 
-In [11]: spark.sql(f"CREATE DATABASE {db}")
+In [11]: spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {db}")
 Out[11]: DataFrame[]
 
 In [13]: df = spark.read.option("header", True).option("sep", "\t").csv("s3a://t
@@ -129,8 +136,7 @@ In [19]: columns = [
 
 In [20]: df = df.select(*columns)
 
-In [23]: df.write.mode("overwrite").option("compression", "snappy").format("delt
-       ⋮ a").saveAsTable(table)
+In [23]: df.writeTo(table).using("iceberg").createOrReplace()
 
 In [24]: spark.stop()
 ```

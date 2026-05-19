@@ -12,16 +12,16 @@ could be added in the future, e.g. responding to data uploaded to a dataplane bu
 
 The action taken depends on the nature of the event. For instance, if a CTS job completes and
 places job output in the data plane, the event system may run code to import data into CDM
-Deltalake tables.
+Iceberg tables managed by the Apache Polaris REST catalog.
 
 For example, the CTS could run checkm2 on a set of input files, and when the job is complete,
 the event processor parses the checkm2 output in the data plane and inserts the results into
-the deltalake tables.
+the Iceberg tables.
 
 ## Notes on Spark Structured Streaming
 
-Since the initial target of the event processor is importing CTS job data into the Spark
-Deltalake tables, an obvious choice of framework for the processor would be
+Since the initial target of the event processor is importing CTS job data into Spark-managed
+Iceberg tables, an obvious choice of framework for the processor would be
 Spark Structured Streaming (SSS). However, after an investigation, it seems SSS is ill-suited
 to our needs:
 
@@ -77,7 +77,7 @@ For now the design will be focused solely on responding to CTS completed job eve
             * Not strictly necessary, but some importers may need to key off
               arguments
      * Run the python code via the Spark session with the YAML file as input
-* Develop a library of helper functions for performing `MERGE` inserts into the Deltalake tables
+* Develop a library of helper functions for performing `MERGE INTO` inserts into the Iceberg tables
     * Will be used in most importers
     * Perhaps one already exists
 
@@ -102,7 +102,8 @@ In order to test the event processor, the following services are needed:
 * Minio
 * Kafka
 * A Spark cluster
-* Postgres (for Hive)
+* Postgres (for Polaris persistence)
+* Apache Polaris (Iceberg REST catalog)
 
 ### KBase
 * Auth2
@@ -213,8 +214,8 @@ to the workers:
 * Importer authors making use of the CDM events processor must implement importers expecting that
   the same event may be processed multiple times. The CTS only guarantees at-least-once
   event processing.
-    * The [MERGE](https://docs.databricks.com/gcp/en/delta/merge) SQL statement
-      is one way to ensure duplicate data is not entered into the CDM.
+    * The [MERGE INTO](https://iceberg.apache.org/docs/latest/spark-writes/#merge-into) SQL
+      statement is one way to ensure duplicate data is not entered into the CDM.
 * Importer authors must ensure their code covers different versions of registered CTS images.
   The code should key off the image digest if processing differences are required between different
   image versions.

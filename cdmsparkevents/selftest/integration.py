@@ -2,21 +2,23 @@
 Runs an integration test using the same interface as standard importers.
 """
 
-from delta.tables import DeltaTable
 import logging
+import uuid
+from typing import Any, Protocol
+
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, IntegerType, StructField, StringType
-from typing import Protocol, Any
+from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 
 class GetSpark(Protocol):
     """
     Typing for a function that provides a spark session.
     """
+
     def __call__(self, *, executor_cores: int | None = ...) -> SparkSession:
         """
         Create a spark session.
-        
+
         executor_cores - the number of cores per Spark executor.
         """
         ...
@@ -24,17 +26,19 @@ class GetSpark(Protocol):
 
 _DB_NAME = "cdm_events_live_integration_test_db_obfuscate_ijphuihjpo"
 _TABLE_NAME = "employees"
-_FULL_TABLE_NAME = f'{_DB_NAME}.{_TABLE_NAME}'
-_SCHEMA = StructType([
-   StructField("employee_id", IntegerType(), nullable=False),
-   StructField("employee_name", StringType(), nullable=False)
-])
+_FULL_TABLE_NAME = f"{_DB_NAME}.{_TABLE_NAME}"
+_SCHEMA = StructType(
+    [
+        StructField("employee_id", IntegerType(), nullable=False),
+        StructField("employee_name", StringType(), nullable=False),
+    ]
+)
 
 
 def run_import(get_spark: GetSpark, job_info: dict[str, Any], metadata: dict[str, Any]):
     """
     Run the import code.
-    
+
     get_spark - a function to get a spark session. The arguments are:
         executor_cores - an optional argument defining the number of cores to use per Spark
             executor. The default is 1.
@@ -49,37 +53,38 @@ def run_import(get_spark: GetSpark, job_info: dict[str, Any], metadata: dict[str
     logr.info("Running integration test", extra={"job_info": job_info})
     data = job_info["input_data"]
     mode = job_info.get("mode", "update")
-    
+
     spark = get_spark()
-    spark.sql(f"CREATE DATABASE IF NOT EXISTS {_DB_NAME}")
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {_DB_NAME}")
     spark.sql(f"""
         CREATE TABLE IF NOT EXISTS {_FULL_TABLE_NAME} (
             employee_id INT,
             employee_name STRING
         )
-        USING DELTA
-        """
-    )
+        USING ICEBERG
+        """)
 
-    delta_table = DeltaTable.forName(spark, _FULL_TABLE_NAME)
-    
     # Alias for merge
     target = "target"
     source = "source"
-    
+
     merge_condition = f"{target}.employee_id = {source}.employee_id"
-    
+
     df = spark.createDataFrame(data, schema=_SCHEMA)
-    
-    preex = delta_table.alias(
-        target
-        ).merge(source=df.alias(source), condition=merge_condition
-        ).whenNotMatchedInsertAll(
-    )
+    source_view = f"source_{uuid.uuid4()}".replace("-", "_")
+    df.createOrReplaceTempView(source_view)
+
+    matched_clause = ""
     if mode == "update":
-        preex = preex.whenMatchedUpdateAll()
-    preex.execute()
-    
+        matched_clause = "WHEN MATCHED THEN UPDATE SET *"
+    spark.sql(f"""
+        MERGE INTO {_FULL_TABLE_NAME} {target}
+        USING {source_view} {source}
+        ON {merge_condition}
+        {matched_clause}
+        WHEN NOT MATCHED THEN INSERT *
+        """)
+
     current_table_df = spark.sql(f"SELECT * FROM {_FULL_TABLE_NAME}")
     logr.info(
         "Completed integration test. Current table contents:\n"

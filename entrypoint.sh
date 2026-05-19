@@ -35,4 +35,28 @@ else
   echo "Loaded token from $CSEP_CDM_TASK_SERVICE_ADMIN_TOKEN_FILE into environment."
 fi
 
+if [ -n "$(trim "$CSEP_POLARIS_CREDENTIAL")" ]; then
+  echo "Using provided CSEP_POLARIS_CREDENTIAL environment variable."
+else
+  if [ -z "$CSEP_POLARIS_CREDENTIAL_FILE" ]; then
+    echo "Error: CSEP_POLARIS_CREDENTIAL is not set, and CSEP_POLARIS_CREDENTIAL_FILE is not provided." >&2
+    exit 1
+  fi
+
+  if [ ! -f "$CSEP_POLARIS_CREDENTIAL_FILE" ]; then
+    echo "Error: Polaris credential file '$CSEP_POLARIS_CREDENTIAL_FILE' does not exist." >&2
+    exit 1
+  fi
+
+  polaris_credential="$(trim "$(cat "$CSEP_POLARIS_CREDENTIAL_FILE")")"
+
+  if [ -z "$polaris_credential" ]; then
+    echo "Error: Polaris credential file '$CSEP_POLARIS_CREDENTIAL_FILE' is empty or only whitespace." >&2
+    exit 1
+  fi
+
+  export CSEP_POLARIS_CREDENTIAL="$polaris_credential"
+  echo "Loaded Polaris credential from $CSEP_POLARIS_CREDENTIAL_FILE into environment."
+fi
+
 python /csep/cdmsparkevents/main.py "$@"
