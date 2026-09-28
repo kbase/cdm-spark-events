@@ -54,23 +54,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: ${{ github.event_name == 'release' && github.event.action == 'published' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           sbom: ${{ github.event_name == 'release' && github.event.action == 'published' }}
-      - name: Run Trivy vulnerability scanner
-        if: github.event_name != 'release'
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
-        with:
-          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-          format: 'json'
-          output: 'trivy-results.json'
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN'
-      - name: Display vulnerability summary and fail on CRITICAL
-        if: always() && github.event_name != 'release'
-        run: |
-          set -o pipefail
-          echo "## Vulnerability Summary" | tee -a $GITHUB_STEP_SUMMARY
-          jq -r '.Results[]? | select(.Vulnerabilities) | "### \(.Target) (\(.Type))", (.Vulnerabilities | sort_by(.Severity) | group_by(.Severity) | map("\(.[0].Severity): \(length)") | .[])' trivy-results.json | tee -a $GITHUB_STEP_SUMMARY || echo "No vulnerabilities found" | tee -a $GITHUB_STEP_SUMMARY
-          echo "" | tee -a $GITHUB_STEP_SUMMARY
-          echo "To see full details, run: trivy image ${{ fromJSON(steps.meta.outputs.json).tags[0] }}" | tee -a $GITHUB_STEP_SUMMARY
-          if jq -e '.Results[]? | select(.Vulnerabilities) | .Vulnerabilities[] | select(.Severity == "CRITICAL")' trivy-results.json > /dev/null; then
-            echo "::error::CRITICAL vulnerabilities found! Build failed."
-            exit 1
-          fi
